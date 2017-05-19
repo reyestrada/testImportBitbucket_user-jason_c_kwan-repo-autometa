@@ -51,7 +51,7 @@ family_dummy_matrix = pd.get_dummies(contig_table['family'])
 genus_dummy_matrix = pd.get_dummies(contig_table['genus'])
 species_dummy_martix = pd.get_dummies(contig_table['species'])
 
-#2. Parse vizbin, cov, and taxonomy info in "features" and autometa-defined
+#2. Parse bh_tsne, cov, and taxonomy info in "features" and autometa-defined
 # clusters into "labels" for classifier using appropriate data structure
 print("Loading other features and labels...")
 features = []
@@ -71,27 +71,27 @@ for count,contig in enumerate(contig_table['contig']):
     taxonomy_matrix_dict[contig] = taxonomy
     if train_w_markers.lower() == "true":
         if contig_table['num_single_copies'][count] > 0 and cluster != unclustered_name:
-            vizbin_x = contig_table['bh_tsne_x'][count]
-            vizbin_y = contig_table['bh_tsne_y'][count]
+            bh_tsne_x = contig_table['bh_tsne_x'][count]
+            bh_tsne_y = contig_table['bh_tsne_y'][count]
             length = contig_table['length'][count]
             cov = contig_table['cov'][count]
             gc = contig_table['gc'][count]
             #Actually the label here should be the bin name
             #label = known_genome
             label = cluster
-            features.append([vizbin_x,vizbin_y,cov] + taxonomy)
+            features.append([bh_tsne_x,bh_tsne_y,cov] + taxonomy)
             labels.append(label)
     elif train_w_markers.lower() == "false":
         if cluster != unclustered_name:
-            vizbin_x = contig_table['vizbin_x'][count]
-            vizbin_y = contig_table['vizbin_y'][count]
+            bh_tsne_x = contig_table['bh_tsne_x'][count]
+            bh_tsne_y = contig_table['bh_tsne_y'][count]
             length = contig_table['length'][count]
             cov = contig_table['cov'][count]
             gc = contig_table['gc'][count]
             #Actually the label here should be the bin name
             #label = known_genome
             label = cluster
-            features.append([vizbin_x,vizbin_y,cov] + taxonomy)
+            features.append([bh_tsne_x,bh_tsne_y,cov] + taxonomy)
             labels.append(label)
     else:
         print("Unrecognized argument for -m.\nExiting...")
@@ -163,10 +163,10 @@ temp_contig_table = contig_table.copy(deep=True)
 print("Recruiting unclustered sequences. This could take a while...")
 for count,contig in enumerate(contig_table['contig']):
     taxonomy = taxonomy_matrix_dict[contig]
-    vizbin_x_x = contig_table.iloc[count]['vizbin_x']
-    vizbin_y_x = contig_table.iloc[count]['vizbin_y']
+    bh_tsne_x_x = contig_table.iloc[count]['bh_tsne_x']
+    bh_tsne_y_x = contig_table.iloc[count]['bh_tsne_y']
     cov_x = contig_table.iloc[count]['cov']
-    composition_feature_list = [vizbin_x_x,vizbin_y_x,cov_x]
+    composition_feature_list = [bh_tsne_x_x,bh_tsne_y_x,cov_x]
     #Concatenate composition and taxonomy features into single list
     single_np_array = np.array([composition_feature_list + taxonomy])
     contig_length = contig_table.iloc[count]['length']
