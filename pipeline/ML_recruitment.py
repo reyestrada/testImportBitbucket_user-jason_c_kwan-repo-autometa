@@ -28,6 +28,9 @@ parser.add_argument('-o','--out_table', help='Output table with new column\
     for ML-recruited sequences.',required=True)
 args = vars(parser.parse_args())
 
+#Disable pandas warnings
+pd.options.mode.chained_assignment = None
+
 #Set load paramters - convert to argparse
 bootstrap_iterations = int(args['num_iterations'])
 confidence_cutoff = float(args['Confidence_cutoff'])
@@ -68,8 +71,8 @@ for count,contig in enumerate(contig_table['contig']):
     taxonomy_matrix_dict[contig] = taxonomy
     if train_w_markers.lower() == "true":
         if contig_table['num_single_copies'][count] > 0 and cluster != unclustered_name:
-            vizbin_x = contig_table['vizbin_x'][count]
-            vizbin_y = contig_table['vizbin_y'][count]
+            vizbin_x = contig_table['bh_tsne_x'][count]
+            vizbin_y = contig_table['bh_tsne_y'][count]
             length = contig_table['length'][count]
             cov = contig_table['cov'][count]
             gc = contig_table['gc'][count]
