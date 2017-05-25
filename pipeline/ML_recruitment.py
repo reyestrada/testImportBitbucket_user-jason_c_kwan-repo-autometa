@@ -31,9 +31,73 @@ args = vars(parser.parse_args())
 #Disable pandas warnings
 pd.options.mode.chained_assignment = None
 
+def round_down(num, divisor):
+    return num - (num%divisor)
+
+def jackknife_training(features,labels):
+    #Function to randomly subsample data into halves (hence 0.5), train
+    #ML-classifier and make prediction. Used iteratively in
+    #calculate_bootstap_replicates() function (see below)
+    train_features, test_features, train_labels, test_labels = train_test_split(features, labels, test_size = 0.50)
+    my_classifier = tree.DecisionTreeClassifier()
+    my_classifier = my_classifier.fit(train_features,train_labels)
+    predictions = my_classifier.predict(test_features)
+    return my_classifier
+
+def calculate_bootstap_replicates(feature_array,iterations = 10):
+    prediction_list = []
+    for i in range(iterations):
+        #Here features and labels are global variables
+        jackknifed_classifier = jackknife_training(features,labels)
+        ML_prediction = jackknifed_classifier.predict(feature_array)[0]
+        prediction_list.append(ML_prediction)
+    counter = collections.Counter(prediction_list)
+    top_prediction_set = counter.most_common(1)
+    top_prediction = top_prediction_set[0][0]
+    confidence = top_prediction_set[0][1]
+    confidence_percent = round(confidence/iterations*100,3)
+    #To see frequency of all prediction: print counter
+    return top_prediction,confidence_percent
+
+def redundant_marker_prediction(contig_name,predicted_cluster,pandas_table,cluster_column_name):
+    #Function to check for redundancy of single copy gene markers in ML
+    #predictions. The way it's written now,
+    #Get a list of PFAM markers from current cluster
+    cluster_df = pandas_table.loc[pandas_table[cluster_column_name] == predicted_cluster]
+    cluster_PFAMs = []
+    for count,contig in enumerate(cluster_df['contig']):
+        #If it's a marker contig
+        if cluster_df['num_single_copies'].iloc[count] > 0:
+            contig_PFAMs = cluster_df['single_copy_PFAMs'].iloc[count].split(",")
+            cluster_PFAMs += contig_PFAMs
+    contig_index = list(pandas_table['contig']).index(contig_name)
+    #contig_df = pandas_table.loc[(pandas_table.contig == contig_name)]
+    redundancy = False
+    #if len(contig_PFAMs) > 0:
+    #Avoid non-marker contigs in this calculation, for some reason evaluating to floats..
+    if not isinstance(pandas_table.iloc[contig_index]['single_copy_PFAMs'],float):
+        contig_PFAMs = pandas_table['single_copy_PFAMs'][contig_index].split(",")
+        for PFAM in contig_PFAMs:
+            if PFAM in cluster_PFAMs:
+                redundancy = True
+                print("-->This prediction adds marker redundancy...skipping...")
+                return redundancy
+            else:
+                pass
+    else:
+        #If no markers, can't add contamination...
+        redundancy = False
+        return redundancy
+    #Maybe this update should happen after function return?
+    #pandas_table[cluster_column_name][contig_index] = predicted_cluster
+    return redundancy
+
 #Set load paramters - convert to argparse
 bootstrap_iterations = int(args['num_iterations'])
 confidence_cutoff = float(args['Confidence_cutoff'])
+#confidence_cutoff = confidence_cutoff#/float(bootstrap_iterations)
+if confidence_cutoff % bootstrap_iterations != 0  and len(str(confidence_cutoff)) == len(str(bootstrap_iterations)):
+    confidence_cutoff = round_down(confidence_cutoff,bootstrap_iterations)
 cluster_column_name = args['cluster_column']
 unclustered_name = args['unclustered_name']
 train_w_markers = args['train_w_markers']
@@ -96,64 +160,6 @@ for count,contig in enumerate(contig_table['contig']):
     else:
         print("Unrecognized argument for -m.\nExiting...")
         exit()
-
-def jackknife_training(features,labels):
-    #Function to randomly subsample data into halves (hence 0.5), train
-    #ML-classifier and make prediction. Used iteratively in
-    #calculate_bootstap_replicates() function (see below)
-    train_features, test_features, train_labels, test_labels = train_test_split(features, labels, test_size = 0.50)
-    my_classifier = tree.DecisionTreeClassifier()
-    my_classifier = my_classifier.fit(train_features,train_labels)
-    predictions = my_classifier.predict(test_features)
-    return my_classifier
-
-def calculate_bootstap_replicates(feature_array,iterations = 10):
-    prediction_list = []
-    for i in range(iterations):
-        #Here features and labels are global variables
-        jackknifed_classifier = jackknife_training(features,labels)
-        ML_prediction = jackknifed_classifier.predict(feature_array)[0]
-        prediction_list.append(ML_prediction)
-    counter = collections.Counter(prediction_list)
-    top_prediction_set = counter.most_common(1)
-    top_prediction = top_prediction_set[0][0]
-    confidence = top_prediction_set[0][1]
-    confidence_percent = round(confidence/iterations*100,3)
-    #To see frequency of all prediction: print counter
-    return top_prediction,confidence_percent
-
-def redundant_marker_prediction(contig_name,predicted_cluster,pandas_table,cluster_column_name):
-    #Function to check for redundancy of single copy gene markers in ML
-    #predictions. The way it's written now,
-    #Get a list of PFAM markers from current cluster
-    cluster_df = pandas_table.loc[pandas_table[cluster_column_name] == predicted_cluster]
-    cluster_PFAMs = []
-    for count,contig in enumerate(cluster_df['contig']):
-        #If it's a marker contig
-        if cluster_df['num_single_copies'].iloc[count] > 0:
-            contig_PFAMs = cluster_df['single_copy_PFAMs'].iloc[count].split(",")
-            cluster_PFAMs += contig_PFAMs
-    contig_index = list(pandas_table['contig']).index(contig_name)
-    #contig_df = pandas_table.loc[(pandas_table.contig == contig_name)]
-    redundancy = False
-    #if len(contig_PFAMs) > 0:
-    #Avoid non-marker contigs in this calculation, for some reason evaluating to floats..
-    if not isinstance(pandas_table.iloc[contig_index]['single_copy_PFAMs'],float):
-        contig_PFAMs = pandas_table['single_copy_PFAMs'][contig_index].split(",")
-        for PFAM in contig_PFAMs:
-            if PFAM in cluster_PFAMs:
-                redundancy = True
-                print("-->This prediction adds marker redundancy...skipping...")
-                return redundancy
-            else:
-                pass
-    else:
-        #If no markers, can't add contamination...
-        redundancy = False
-        return redundancy
-    #Maybe this update should happen after function return?
-    #pandas_table[cluster_column_name][contig_index] = predicted_cluster
-    return redundancy
 
 ML_predictions_dict = {}
 ML_recruitment_list = []
