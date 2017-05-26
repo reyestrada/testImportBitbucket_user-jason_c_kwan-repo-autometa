@@ -531,7 +531,16 @@ def assessClusters(table):
 	cluster_list = subset_table['cluster'].tolist()
 	contig_list = subset_table['contig'].tolist()
 
+	# Get contig lengths
+	contig_lengths = dict()
+	for i,row in subset_table.iterrows():
+		current_contig = row['contig']
+		current_length = int(row['length'])
+		contig_lengths[current_contig] = current_length
+
 	taxonomy_matrix = list()
+	expanded_cluster_list = list()
+	contig_indices = dict()
 
 	if taxonomy_table_path:
 		phylum_dummy_matrix = pd.get_dummies(subset_table['phylum'])
@@ -549,12 +558,28 @@ def assessClusters(table):
 			tax_genus = list(genus_dummy_matrix.iloc[j])
 			tax_species = list(species_dummy_martix.iloc[j])
 			taxonomy = tax_phylum + tax_class + tax_order + tax_family + tax_genus + tax_species
-			taxonomy_matrix.append(taxonomy)
+			# Determine iteration
+			if contig_lengths[contig] < 10000:
+				taxonomy_matrix.append(taxonomy)
+				expanded_cluster_list.append(cluster_list[j])
+				contig_indices[contig] = [len(expanded_cluster_list) - 1]
+			else:
+				repeat_number = int(floor(float(contig_lengths[contig])/10000))
+				contig_indices[contig] = list()
+				for i in range(0, repeat_number):
+					taxonomy_matrix.append(taxonomy)
+					expanded_cluster_list.append(cluster_list[j])
+					contig_indices[contig].append(len(expanded_cluster_list) - 1)
 
 	# Make normalized k-mer matrix
 	k_mer_counts = list()
 	for contig in contig_list:
-		k_mer_counts.append(k_mer_dict[contig])
+		if contig_lengths[contig] < 10000:
+			k_mer_counts.append(k_mer_dict[contig])
+		else:
+			repeat_number = int(floor(float(contig_lengths[contig])/10000))
+			for i in range(0, repeat_number):
+				k_mer_counts.append(k_mer_dict[contig])
 
 	normalized_k_mer_matrix = normalizeKmers(k_mer_counts)
 
@@ -570,19 +595,22 @@ def assessClusters(table):
 			cluster_counts[current_cluster] = { 'congruent': 0, 'different': 0 }
 
 		# Set up data structures for training/classification
-		contig_index = contig_list.index(current_contig)
+		#contig_index = contig_list.index(current_contig)
+		contig_index_list = contig_indices[contig]
 		classification_features = None
 
 		features = list()
 		labels = list()
 
-		for j in range(0, len(contig_list)):
+		#for j in range(0, len(contig_list)):
+		for j in range(0, len(pca_matrix)):
 			if taxonomy_table_path:
 				current_features = np.array(taxonomy_matrix[j] + pca_matrix[j].tolist())
 			else:
 				current_features = pca_matrix[j]
 
-			if j == contig_index:
+			#if j == contig_index:
+			if j in contig_index_list:
 				classification_features = np.array([current_features])
 			else:
 				features.append(current_features)
