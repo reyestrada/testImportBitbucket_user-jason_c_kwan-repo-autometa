@@ -564,7 +564,7 @@ def assessClusters(table):
 				expanded_cluster_list.append(cluster_list[j])
 				contig_indices[contig] = [len(expanded_cluster_list) - 1]
 			else:
-				repeat_number = int(floor(float(contig_lengths[contig])/10000))
+				repeat_number = int(math.floor(float(contig_lengths[contig])/10000))
 				contig_indices[contig] = list()
 				for i in range(0, repeat_number):
 					taxonomy_matrix.append(taxonomy)
@@ -577,7 +577,7 @@ def assessClusters(table):
 		if contig_lengths[contig] < 10000:
 			k_mer_counts.append(k_mer_dict[contig])
 		else:
-			repeat_number = int(floor(float(contig_lengths[contig])/10000))
+			repeat_number = int(math.floor(float(contig_lengths[contig])/10000))
 			for i in range(0, repeat_number):
 				k_mer_counts.append(k_mer_dict[contig])
 
