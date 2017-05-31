@@ -974,15 +974,16 @@ while bad_clusters:
 		cluster = row['cluster']
 		contig_clusters[contig] = cluster
 
-	filtered_contig_reassignments = dict()
-	for contig in contig_reassignments:
-		current_cluster = contig_clusters[contig]
-		if current_cluster in good_clusters:
-			continue
-		else:
-			filtered_contig_reassignments[contig] = contig_reassignments[contig]
+	#filtered_contig_reassignments = dict()
+	#for contig in contig_reassignments:
+	#	current_cluster = contig_clusters[contig]
+	#	if current_cluster in good_clusters:
+	#		continue
+	#	else:
+	#		filtered_contig_reassignments[contig] = contig_reassignments[contig]
 
-	reassignClusters(master_table, filtered_contig_reassignments)
+	#reassignClusters(master_table, filtered_contig_reassignments)
+	reassignClusters(master_table, contig_reassignments)
 
 	print('Cluster assessment iteration: ' + str(iteration))
 	logger.info('Cluster assessment iteration: ' + str(iteration))
