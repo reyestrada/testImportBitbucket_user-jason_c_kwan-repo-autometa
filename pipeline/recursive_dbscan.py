@@ -590,7 +590,7 @@ def assessClusters(table):
 
 		ML_prediction, confidence = calculate_bootstap_replicates(classification_features, features, labels, 10)
 
-		if ML_prediction == current_cluster and confidence >= 50:
+		if ML_prediction == current_cluster and confidence >= 90:
 			cluster_counts[current_cluster]['congruent'] += 1
 		else:
 			cluster_counts[current_cluster]['different'] += 1
@@ -959,13 +959,13 @@ cluster_scores, contig_reassignments = assessClusters(master_table) # cluster_sc
 logger.debug(pprint.pformat(cluster_scores))
 iteration += 1
 
-good_clusters = dict()
+#good_clusters = dict()
 bad_clusters = True
 while bad_clusters:
-	# Make note of "good" clusters that are >= 90%
-	for cluster in cluster_scores:
-		if cluster_scores[cluster] == 100:
-			good_clusters[cluster] = 1
+	## Make note of "good" clusters that are >= 90%
+	#for cluster in cluster_scores:
+	#	if cluster_scores[cluster] == 100:
+	#		good_clusters[cluster] = 1
 
 	# Now filter out reassignments according to the running list of "good" clusters
 	contig_clusters = dict()
@@ -993,7 +993,8 @@ while bad_clusters:
 
 	bad_clusters = False
 	for cluster in cluster_scores:
-		if cluster_scores[cluster] < 90 and cluster not in good_clusters:
+		#if cluster_scores[cluster] < 90 and cluster not in good_clusters:
+		if cluster_scores[cluster] < 90:
 			bad_clusters = True
 
 
