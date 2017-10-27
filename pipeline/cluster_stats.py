@@ -32,12 +32,15 @@ def calculateClusterStats(pandas_table,cluster_column,life_domain="bacteria"):
     for count,contig in enumerate(pandas_table['contig']):
         label = pandas_table[cluster_column][count]
         num_markers = pandas_table['num_single_copies'][count]
-        if num_markers >= 1:
-            if label not in cluster_dict:
-                cluster_dict[label] = {}
+        if label not in cluster_dict:
+            cluster_dict[label] = {}
+            if num_markers >= 1:
                 cluster_dict[label]['PFAMs'] = pandas_table.iloc[count]['single_copy_PFAMs'].split(",")
             else:
-                cluster_dict[label]['PFAMs'] += pandas_table.iloc[count]['single_copy_PFAMs'].split(",")
+                cluster_dict[label]['PFAMs'] = []
+        elif num_markers >= 1:
+            cluster_dict[label]['PFAMs'] += pandas_table.iloc[count]['single_copy_PFAMs'].split(",")
+
 
     #Now calculate completeness and purity for each cluster
     for cluster,PFAM_dict in cluster_dict.items():
