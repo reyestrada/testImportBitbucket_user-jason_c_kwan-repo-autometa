@@ -23,4 +23,4 @@ for count,row in master_table.iterrows():
 
 master_table['reference_training'] = reference_training_list
 
-master_table.to_csv(args['out_tab'], sep='\t')
+master_table.to_csv(args['out_tab'], sep='\t',index=False)
