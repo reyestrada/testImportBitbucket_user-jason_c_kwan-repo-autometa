@@ -29,7 +29,8 @@ import csv
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.Alphabet import IUPAC
-from tsne import bh_sne
+#from tsne import bh_sne
+import bhtsne
 from sklearn import decomposition
 import os
 #import statistics
@@ -52,14 +53,14 @@ def run_BH_tSNE(table, do_pca=True):
 
 	normalized_k_mer_submatrix = normalizeKmers(k_mer_counts_submatrix)
 
-	# PCA
-
-	if (len(normalized_k_mer_submatrix[0]) > pca_dimensions) and (do_pca == True):
-		logger.info('run_BH_tSNE: Principal component analysis')
-		pca = decomposition.PCA(n_components=pca_dimensions)
-		pca_matrix = pca.fit_transform(normalized_k_mer_submatrix)
-	else:
-		logger.info('run_BH_tSNE: Principle component analysis step skipped')
+	## PCA
+	#
+	#if (len(normalized_k_mer_submatrix[0]) > pca_dimensions) and (do_pca == True):
+	#	logger.info('run_BH_tSNE: Principal component analysis')
+	#	pca = decomposition.PCA(n_components=pca_dimensions)
+	#	pca_matrix = pca.fit_transform(normalized_k_mer_submatrix)
+	#else:
+	#	logger.info('run_BH_tSNE: Principle component analysis step skipped')
 
 	# BH-tSNE
 	logger.info('run_BH_tSNE: BH-tSNE')
@@ -72,12 +73,17 @@ def run_BH_tSNE(table, do_pca=True):
 	logger.info(str(len(normalized_k_mer_submatrix)) + ' data points')
 	logger.info(str(len(normalized_k_mer_submatrix[0])) + ' dimensions')
 
-	if (len(normalized_k_mer_submatrix[0]) > pca_dimensions) and (do_pca == True):
-		X = np.array(pca_matrix)
-	else:
-		X = np.array(normalized_k_mer_submatrix)
-	bh_tsne_matrix = bh_sne(X, d=2, perplexity=perplexity, theta=0.5)
+	#if (len(normalized_k_mer_submatrix[0]) > pca_dimensions) and (do_pca == True):
+	#	X = np.array(pca_matrix)
+	#else:
+	#	X = np.array(normalized_k_mer_submatrix)
+	#bh_tsne_matrix = bh_sne(X, d=2, perplexity=perplexity, theta=0.5)
 
+	X = np.array(normalized_k_mer_matrix)
+	if normalized_k_mer_submatrix[0] > 50:
+		bh_tsne_matrix = bhtsne.run_bh_tsne(X, no_dims = 2, perplexity = perplexity, theta = 0.5, initial_dims = 50, use_pca = True, max_iter = 5000)
+	else:
+		bh_tsne_matrix = bhtsne.run_bh_tsne(X, no_dims = 2, perplexity = perplexity, theta = 0.5, max_iter = 5000)
 	# We will add bh_tsne_x and bh_tsne_y columns to the contig table
 
 	bh_tsne_x = list()

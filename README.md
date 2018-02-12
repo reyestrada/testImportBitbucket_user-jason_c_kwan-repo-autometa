@@ -65,6 +65,14 @@ make install
 
 You should add the ~/samtools/bin folder to your $PATH environmental variable.
 
+Intall BHtSNE
+
+```
+git clone https://github.com/lvdmaaten/bhtsne
+cd bhtsne
+g++ sptree.cpp tsne.cpp tsne_main.cpp -o bh_tsne -O2
+```
+
 Install Anaconda Python.
 
 ```
@@ -77,10 +85,6 @@ Install Python modules.
 
 ```
 conda install tqdm joblib biopython
-git clone https://github.com/danielfrg/tsne.git
-sudo apt-get install libatlas-base-dev
-cd tsne
-python setup.py install
 ```
 
 Now download Autometa.
