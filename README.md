@@ -14,6 +14,7 @@ Third party programs
 * [HMMER](http://hmmer.org)
 * [DIAMOND](https://github.com/bbuchfink/diamond)
 * [Anaconda Python](https://www.anaconda.com)
+* [bhtsne](https://github.com/lvdmaaten/bhtsne)
 
 Databases (these will be automatically downloaded the first time you run make\_taxonomy\_table.py). NOTE: You will need ~150 GB (at time of writing) to download and process these.
 
@@ -25,7 +26,6 @@ Python packages (Note: this list assumes the use of Anaconda Python)
 
 * [tqdm](https://pypi.python.org/pypi/tqdm/4.19.5)
 * [BioPython](http://biopython.org)
-* [tsne](https://pypi.python.org/pypi/tsne)
 * [joblib](https://pypi.python.org/pypi/joblib)
 
 Additionally, if you want to calculate your own contig coverages (rather than trusting the coverage values given by the SPAdes assembler), you will need:
@@ -71,7 +71,18 @@ Intall BHtSNE
 git clone https://github.com/lvdmaaten/bhtsne
 cd bhtsne
 g++ sptree.cpp tsne.cpp tsne_main.cpp -o bh_tsne -O2
+touch __init__.py
 ```
+
+To make sure Autometa can import the bhtsne module, enter an interactive python session and issue the following commands:
+
+```
+import sys
+sys.path.append("~/bhtsne")
+exit()
+```
+
+In the above, I have assumed that you cloned bhtsne to your home directory ("~"). If you have used a different location, substitute it in the command above.
 
 Install Anaconda Python.
 

@@ -25,7 +25,8 @@ RUN mkdir diamond && cd diamond && wget http://github.com/bbuchfink/diamond/rele
 RUN wget https://github.com/samtools/samtools/releases/download/1.6/samtools-1.6.tar.bz2
 RUN tar -vxjf samtools-1.6.tar.bz2
 RUN cd samtools-1.6 && ./configure --prefix=/samtools && make && make install
-RUN git clone https://github.com/lvdmaaten/bhtsne && cd bhtsne && g++ sptree.cpp tsne.cpp tsne_main.cpp -o bh_tsne -O2
+RUN git clone https://github.com/lvdmaaten/bhtsne && cd bhtsne && g++ sptree.cpp tsne.cpp tsne_main.cpp -o bh_tsne -O2 && touch __init__.py
 RUN git clone https://bitbucket.org/jason_c_kwan/autometa && cd autometa/pipeline && python setup_lca_functions.py build_ext --inplace
 
 ENV PATH="/diamond:/autometa/pipeline:/samtools/bin:${PATH}"
+ENV PYTHONPATH="${PYTHONPATH}:/bhtsne"
