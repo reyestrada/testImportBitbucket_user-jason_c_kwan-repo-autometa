@@ -180,8 +180,15 @@ for cluster in cluster_sequences:
 		if markers_in_cluster[cluster][pfam] == 1:
 			number_unique_markers += 1
 
-	completeness = (number_markers_found / total_markers) * 100
-	purity = (number_unique_markers / number_markers_found) * 100
+	if total_markers == 0:
+		# This protects from divide by zero
+		completeness = 'unknown'
+	else:	
+		completeness = (number_markers_found / total_markers) * 100
+	if number_markers_found == 0:
+		purity = 'unknown'
+	else:	
+		purity = (number_unique_markers / number_markers_found) * 100
 
 	# Calculate average GC and cov, weighted by sequence length
 	weighted_gc_av = 0.0
