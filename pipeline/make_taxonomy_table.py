@@ -286,12 +286,20 @@ current_nr_md5 = db_dir_path + '/nr.gz.md5'
 if usr_prot_path:
 	usr_prot_path = os.path.abspath(usr_prot_path)
 	if os.path.isdir(usr_prot_path):
-		print('You have provided a directory {}. \
-		--user_prot_db requires a file path.'.format(usr_prot_path))
+		print('You have provided a directory {}. --user_prot_db requires a file path.'.format(usr_prot_path))
 		exit(1)
 	elif not os.path.isfile(usr_prot_path):
 		print('{} is not a file.'.format(usr_prot_path))
 		exit(1)
+	elif not os.path.abspath(usr_prot_path).endswith('.dmnd'):
+		usr_prot_dmnd_file = usr_prot_path.split('/')[-1]
+		print('{} is not formatted for diamond. Running diamond makedb cmd.'.format(usr_prot_dmnd_file))
+		print("building {}.dmnd database in {}, this may take some time".format(usr_prot_dmnd_file, db_dir_path))
+		dmnd_db_location = '/'.join([db_dir_path, usr_prot_dmnd_file])
+		returnCode = subprocess.call("diamond makedb --in {} --db {} -p {}".format(usr_prot_path, dmnd_db_location, num_processors), shell = True)
+		if returnCode == 0:
+			print('{}.dmnd created. Continuing...'.format(usr_prot_dmnd_file))
+			diamond_db_path = dmnd_db_location
 	else:
 		diamond_db_path = usr_prot_path
 
