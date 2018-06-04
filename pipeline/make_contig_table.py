@@ -42,7 +42,7 @@ fasta_assembly_path = os.path.abspath(args['assembly'])
 coverage_table_path = args['coverage']
 output_table_path = args['output']
 no_coverage_mode = args['no_coverage']
-
+error_extracting = False
 use_coverage_table = False
 
 if coverage_table_path is not None:
@@ -100,9 +100,10 @@ for seq_record in SeqIO.parse(fasta_assembly_path, 'fasta'):
 			output.write(contig + '\t' + length + '\t' + gc + '\t' + str(cov) + '\n')
 		else:
 			print('Error, ' + contig + ' not the right format to extract coverage from sequence name')
-			print('For appropriate sequence coverage parsing, First perform calculate_read_coverage.py')
+            error_extracting = True
 			output.write(contig + '\t' + length + '\t' + gc + '\n')
 
-
+if error_extracting:
+    print('For appropriate sequence coverage parsing, First perform calculate_read_coverage.py')
 
 output.close

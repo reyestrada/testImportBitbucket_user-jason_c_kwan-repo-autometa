@@ -178,16 +178,16 @@ def run_diamond(prodigal_output, diamond_db_path, num_processors, prodigal_daa):
 	return view_output
 
 #blast2lca using accession numbers#
-def run_blast2lca(input_file, db_dir_path):
+def run_blast2lca(input_file, taxdump_dir):
 	output = output_dir + '/' + '.'.join(os.path.abspath(input_file).split('/')[-1].split('.')[:-1]) + ".lca"
 	if os.path.isfile(output) and not os.stat(prodigal_output + ".lca").st_size == 0:
 		print "{} file already exists!".format(output)
 		print "Continuing to next step..."
 	else:
-		run_command("{}/lca.py database_directory {} {}".format(pipeline_path, db_dir_path, input_file))
+		run_command("{}/lca.py database_directory {} {}".format(pipeline_path, taxdump_dir, input_file))
 	return output
 
-def run_taxonomy(pipeline_path, assembly_path, tax_table_path, db_dir_path,coverage_table=None): #Have to update this
+def run_taxonomy(pipeline_path, assembly_path, tax_table_path, db_dir, coverage_table=None): #Have to update this
 	assembly_filename = assembly_path.split('/')[-1]
 	initial_table_path = output_dir + '/' + assembly_filename + '.tab'
 
@@ -200,7 +200,7 @@ def run_taxonomy(pipeline_path, assembly_path, tax_table_path, db_dir_path,cover
 		else:
 			run_command("{}/make_contig_table.py -a {} -o {}".format(pipeline_path, assembly_path, initial_table_path))
 
-	run_command("{}/add_contig_taxonomy.py {} {} {} {}/taxonomy.tab".format(pipeline_path, initial_table_path, tax_table_path, db_dir_path, output_dir))
+	run_command("{}/add_contig_taxonomy.py {} {} {} {}/taxonomy.tab".format(pipeline_path, initial_table_path, tax_table_path, db_dir, output_dir))
 
 	return output_dir + '/' + 'taxonomy.tab'
 
