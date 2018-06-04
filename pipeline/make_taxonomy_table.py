@@ -178,7 +178,7 @@ def run_diamond(prodigal_output, diamond_db_path, num_processors, prodigal_daa):
 	return view_output
 
 #blast2lca using accession numbers#
-def run_blast2lca(input_file, taxdump_path):
+def run_blast2lca(input_file, db_dir_path):
 	output = output_dir + '/' + '.'.join(os.path.abspath(input_file).split('/')[-1].split('.')[:-1]) + ".lca"
 	if os.path.isfile(output) and not os.stat(prodigal_output + ".lca").st_size == 0:
 		print "{} file already exists!".format(output)
@@ -187,7 +187,7 @@ def run_blast2lca(input_file, taxdump_path):
 		run_command("{}/lca.py database_directory {} {}".format(pipeline_path, db_dir_path, input_file))
 	return output
 
-def run_taxonomy(pipeline_path, assembly_path, tax_table_path, db_dir_path,coverage_table): #Have to update this
+def run_taxonomy(pipeline_path, assembly_path, tax_table_path, db_dir_path,coverage_table=None): #Have to update this
 	assembly_filename = assembly_path.split('/')[-1]
 	initial_table_path = output_dir + '/' + assembly_filename + '.tab'
 
@@ -241,10 +241,9 @@ prodigal_daa = prodigal_output + ".daa"
 filtered_assembly = output_dir + '/' + '.'.join(fasta_filename.split('.')[:-1]) + "_filtered.fasta"
 
 # If cov_table defined, we need to check the file exists
-if cov_table:
-	if not os.path.isfile(cov_table):
-		print("Error! Could not find coverage table at the following path: " + cov_table)
-		exit(1)
+if cov_table and not os.path.isfile(cov_table):
+	print("Error! Could not find coverage table at the following path: " + cov_table)
+	exit(1)
 
 # Check that output dir exists, and create it if it doesn't
 if not os.path.isdir(output_dir):
@@ -263,15 +262,15 @@ elif not os.listdir(db_dir_path):
 	print('AutoMeta databases directory empty, populating with appropriate databases.\nThis may take some time...')
 	update_dbs(db_dir_path)
 
-if not (os.path.isfile(db_dir_path + '/nr.dmnd') or os.path.isfile(db_dir_path + '/nr.dmnd.md5') or os.path.isfile(db_dir_path + '/nr.gz.md5')):
+if not (os.path.isfile(db_dir_path + '/nr.dmnd') or not os.path.isfile(db_dir_path + '/nr.dmnd.md5') or not os.path.isfile(db_dir_path + '/nr.gz.md5')):
 	print('NR database not found, downloading and building DIAMOND database.\nThis may take some time...')
 	update_dbs(db_dir_path, 'nr')
 
-if not (os.path.isfile(db_dir_path + '/prot.accession2taxid') or os.path.isfile(db_dir_path + '/prot.accession2taxid.gz.md5')):
+if not (os.path.isfile(db_dir_path + '/prot.accession2taxid') or not os.path.isfile(db_dir_path + '/prot.accession2taxid.gz.md5')):
 	print('acc2taxid files not found, downloading.\nThis may take some time...')
 	update_dbs(db_dir_path, 'acc2taxid')
 
-if not (os.path.isfile(db_dir_path + '/names.dmp') or os.path.isfile(db_dir_path + '/nodes.dmp') or os.path.isfile(db_dir_path + '/taxdump.tar.gz.md5')):
+if not (os.path.isfile(db_dir_path + '/names.dmp') or not os.path.isfile(db_dir_path + '/nodes.dmp') or not os.path.isfile(db_dir_path + '/taxdump.tar.gz.md5')):
 	print('Taxdump files not found, downloading.\nThis may take some time...')
 	update_dbs(db_dir_path, 'taxdump')
 

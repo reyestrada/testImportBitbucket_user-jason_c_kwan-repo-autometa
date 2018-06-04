@@ -11,7 +11,7 @@
 #
 # Autometa is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the 
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU Affero General Public License for more details.
 #
 # You should have received a copy of the GNU Affero General Public License
@@ -24,7 +24,7 @@ import os
 
 #argument parser
 parser = argparse.ArgumentParser(description='Script tabulate single copy markers \
-	from a metagenome assembly. Dependencies: prodigal v2.6.2 (from "GoogleImport" branch), hhmscan (hmmer 3.1b2)')
+	from a metagenome assembly. Dependencies: prodigal v2.6.2 (from "GoogleImport" branch), hmmscan (hmmer 3.1b2)')
 parser.add_argument('-a','--assembly', help='Input assembly file', required=True)
 parser.add_argument('-p','--processors', help='Number of processors to use for hmmscan', default=1)
 parser.add_argument('-c','--cutoffs', help='Bacterial single copy hmm cutoffs as defined by Rinke et al. Default path is home directory.', default="~/Bacteria_single_copy_cutoffs.txt")

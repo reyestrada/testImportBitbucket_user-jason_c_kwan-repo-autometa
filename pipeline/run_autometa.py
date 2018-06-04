@@ -11,7 +11,7 @@
 #
 # Autometa is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the 
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU Affero General Public License for more details.
 #
 # You should have received a copy of the GNU Affero General Public License
@@ -234,13 +234,12 @@ if not os.path.isfile(fasta_assembly):
 
 #if make_tax_table specified but taxonomy_table_path not defined
 if make_tax_table and not taxonomy_table_path:
-	taxonomy_table_path = output_dir + '/taxonomy.tab' 
+	taxonomy_table_path = output_dir + '/taxonomy.tab'
 
 #If coverage table is given, it must exist
-if cov_table:
-	if not os.path.isfile(cov_table):
-		print('Error! Could not find coverage table at the following path: ' + cov_table)
-		exit(1)
+if cov_table and not os.path.isfile(cov_table):
+	print('Error! Could not find coverage table at the following path: ' + cov_table)
+	exit(1)
 
 #what input variables were and when you ran it (report fill path based on argparse)
 logger.info('Input command: ' + ' '.join(sys.argv))
@@ -295,7 +294,7 @@ if make_tax_table:
 		exit(1)
 
 	# Now change the input fasta to the output of make_taxonomy_table.py
-	filtered_assembly = expected_kingdom_bin_path 
+	filtered_assembly = expected_kingdom_bin_path
 
 recursive_dbscan_output, matrix_file = recursive_dbscan(combined_table_path, filtered_assembly, kingdom)
 

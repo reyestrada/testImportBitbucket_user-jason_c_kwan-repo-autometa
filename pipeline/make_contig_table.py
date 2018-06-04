@@ -11,7 +11,7 @@
 #
 # Autometa is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the 
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU Affero General Public License for more details.
 #
 # You should have received a copy of the GNU Affero General Public License
@@ -78,10 +78,18 @@ for seq_record in SeqIO.parse(fasta_assembly_path, 'fasta'):
 	if use_coverage_table:
 		if contig in coverages:
 			cov = coverages[contig]
+			output.write(contig + '\t' + length + '\t' + gc + '\t' + str(cov) + '\n')
 		else:
-			print('Error, ' + contig + ' not found in the coverage table')
-			quit()
-		output.write(contig + '\t' + length + '\t' + gc + '\t' + str(cov) + '\n')
+			contigList = contig.split('_')
+			if contigList[0] == 'NODE' and contigList[2] == 'length' and contigList[4] == 'cov':
+				cov = str(contigList[5])
+				output.write(contig + '\t' + length + '\t' + gc + '\t' + str(cov) + '\n')
+			else:
+				print('Error: Cannot find {} in {}.'.format(contig, coverage_table_path))
+				print(contig + ' not the right format to extract coverage from sequence name')
+				print('For appropriate sequence coverage parsing, First perform calculate_read_coverage.py')
+				quit()
+
 	elif no_coverage_mode:
 		output.write(contig + '\t' + length + '\t' + gc + '\n')
 	else:
@@ -89,10 +97,12 @@ for seq_record in SeqIO.parse(fasta_assembly_path, 'fasta'):
 		contigList = contig.split('_')
 		if contigList[0] == 'NODE' and contigList[2] == 'length' and contigList[4] == 'cov':
 			cov = str(contigList[5])
+			output.write(contig + '\t' + length + '\t' + gc + '\t' + str(cov) + '\n')
 		else:
 			print('Error, ' + contig + ' not the right format to extract coverage from sequence name')
-			quit()
-		output.write(contig + '\t' + length + '\t' + gc + '\t' + str(cov) + '\n')
-	
+			print('For appropriate sequence coverage parsing, First perform calculate_read_coverage.py')
+			output.write(contig + '\t' + length + '\t' + gc + '\n')
+
+
 
 output.close
