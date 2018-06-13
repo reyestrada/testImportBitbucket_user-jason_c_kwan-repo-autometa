@@ -100,10 +100,10 @@ for seq_record in SeqIO.parse(fasta_assembly_path, 'fasta'):
 			output.write(contig + '\t' + length + '\t' + gc + '\t' + str(cov) + '\n')
 		else:
 			print('Error, ' + contig + ' not the right format to extract coverage from sequence name')
-            error_extracting = True
+			error_extracting = True
 			output.write(contig + '\t' + length + '\t' + gc + '\n')
 
 if error_extracting:
-    print('For appropriate sequence coverage parsing, First perform calculate_read_coverage.py')
+	print('For appropriate sequence coverage parsing, First perform calculate_read_coverage.py')
 
 output.close

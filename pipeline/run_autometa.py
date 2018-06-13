@@ -65,10 +65,10 @@ def run_make_taxonomy_tab(fasta, length_cutoff):
 	if cov_table and usr_prot_path:
 		run_command("{}/make_taxonomy_table.py -a {} -db {} -p {} -l {} -o {} -v {} -udb {}".\
 			format(pipeline_path, fasta, db_dir_path, processors, length_cutoff, output_dir, cov_table, usr_prot_path))
-	elif cov_table and not user_prot_db:
+	elif cov_table and not usr_prot_path:
 		run_command("{}/make_taxonomy_table.py -a {} -db {} -p {} -l {} -o {} -v {}".\
 			format(pipeline_path, fasta, db_dir_path, processors, length_cutoff, output_dir, cov_table))
-	elif not cov_table and user_prot_db:
+	elif not cov_table and usr_prot_path:
 		run_command("{}/make_taxonomy_table.py -a {} -db {} -p {} -l {} -o {} -udb {}".\
 			format(pipeline_path, fasta, db_dir_path, processors, length_cutoff, output_dir, usr_prot_path))
 	else:
@@ -185,7 +185,7 @@ parser.add_argument('-r', '--ML_recruitment', help='Use ML to further recruit un
 parser.add_argument('-m', '--maketaxtable', action='store_true',\
 help='runs make_taxonomy_table.py before performing autometa binning. Must specify databases directory (-db)')
 parser.add_argument('-db', '--db_dir', metavar='<dir>', help="Path to directory with taxdump files. If this doesn't exist, the files will be automatically downloaded", required=False, default=autometa_path + '/databases')
-parser.add_argument('-udb', '--user_prot_db', metavar='<user_prot_db>', help='Replaces the default diamond database (nr.dmnd)', required=False)
+parser.add_argument('-udb', '--user_prot_db', metavar='<user_prot_db>', help='Replaces the default diamond database (nr.dmnd) when building taxonomy table', required=False)
 parser.add_argument('-v', '--cov_table', metavar='<coverage.tab>', help="Path to coverage table made by calculate_read_coverage.py. If this is not specified then coverage information will be extracted from contig names (SPAdes format)", required=False)
 
 args = vars(parser.parse_args())
