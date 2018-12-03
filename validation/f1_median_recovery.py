@@ -17,22 +17,27 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with Autometa. If not, see <http://www.gnu.org/licenses/>.
 
+import sys
+import os
 import pandas as pd
 import numpy as np
-import sys
 
-if not len(sys.argv) >=2:
-    exit('Usage: summarize_f1_stats.py <F1.tab> <F1.tab> ...')
+def summarize_f1_stats(f1_fh, max_bins):
+    df = pd.read_table(f1_fh)
+    df.dropna(inplace=True)
+    df = df[df['ref_genome'] != 'misassembled']
+    recovery = round(sum(df.F1/100.0)/max_bins, 4)
+    median = round(np.median(df.F1/100.0), 4)
+    return(os.path.basename(f1_fh), recovery, median)
 
-input_paths = sys.argv[1:]
+if not len(sys.argv) >=3:
+    exit('Usage: f1_median_recovery.py <F1.tab> <theoretical max no. bins> ...')
 
-def summarize_f1_stats(f1_table_path):
-    f1_table = pd.read_csv(f1_table_path,sep='\t')
-    f1_dict = {}
-    for count,row in f1_table.iterrows():
-        if row['ref_genome'] != "misassembled" and str(row['ref_genome']) != "nan":
-            f1_dict[row['ref_genome']] = row['F1']
-    return f1_table_path,round(sum(f1_dict.values()),1),round(np.median(f1_dict.values()),1)
+f1_tab = sys.argv[1]
+try:
+    theo_max_bins = int(sys.argv[2])
+except:
+    exit("Must provide an int value for the max no. bins")
 
-for fpath in input_paths:
-    print summarize_f1_stats(fpath)
+fname, recovery, median = summarize_f1_stats(f1_tab, theo_max_bins)
+print('Table: {}\t F1 recovery: {}\tmedian F1: {}'.format(fname, recovery, median))
