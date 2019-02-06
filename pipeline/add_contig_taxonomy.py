@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-
+#!/usr/bin/env python3
 # Copyright 2018 Ian J. Miller, Evan Rees, Izaak Miller, Jason C. Kwan
 #
 # This file is part of Autometa.

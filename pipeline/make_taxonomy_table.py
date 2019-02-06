@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2018 Ian J. Miller, Evan R. Rees, Izaak Miller, Jason C. Kwan
 #
@@ -187,8 +187,8 @@ def run_prodigal(path_to_assembly):
 	assembly_fname, _ = os.path.splitext(os.path.basename(path_to_assembly))
 	output_path = output_dir + '/' + assembly_fname + '.orfs.faa'
 	if os.path.isfile(output_path):
-		print "{} file already exists!".format(output_path)
-		print "Continuing to next step..."
+		print("{} file already exists!".format(output_path))
+		print("Continuing to next step...")
 	else:
 		run_command('prodigal -i {} -a {}/{}.orfs.faa -p meta -m -o {}/{}.txt'\
 		.format(path_to_assembly, output_dir, assembly_fname, output_dir, assembly_fname))
@@ -221,7 +221,7 @@ def run_blast2lca(input_file, taxdump_path):
 	fname = os.path.splitext(os.path.basename(input_file))[0] + ".lca"
 	output = '/'.join([output_dir, fname])
 	if os.path.isfile(output) and not os.stat(output).st_size == 0:
-		print "{} file already exists! Continuing to next step...".format(output)
+		print("{} file already exists! Continuing to next step...".format(output))
 	else:
 		run_command("{0}/lca.py database_directory {1} {2}"\
 			.format(pipeline_path, db_dir_path, input_file))
@@ -358,38 +358,38 @@ if not os.path.isfile(filtered_assembly):
 	filtered_assembly = length_trim(fasta_path, length_cutoff)
 
 if not os.path.isfile(prodigal_output + ".faa"):
-	print "Prodigal output not found. Running prodigal..."
+	print("Prodigal output not found. Running prodigal...")
 	#Check for file and if it doesn't exist run make_marker_table
 	run_prodigal(filtered_assembly)
 
 if not os.path.isfile(prodigal_daa):
-	print "Could not find {}. Running diamond blast... ".format(prodigal_daa)
+	print("Could not find {}. Running diamond blast... ".format(prodigal_daa))
 	diamond_output = run_diamond(prodigal_output, diamond_db_path, num_processors, prodigal_daa)
 elif os.stat(prodigal_output + ".daa").st_size == 0:
-	print "{} file is empty. Re-running diamond blast...".format(prodigal_daa)
+	print("{} file is empty. Re-running diamond blast...".format(prodigal_daa))
 	diamond_output = run_diamond(prodigal_output, diamond_db_path, num_processors, prodigal_daa)
 elif not os.path.isfile(prodigal_output + ".tab"):
-	print "{0} not found. The diamond alignment archive ({2}) may be invalid.\n\
+	print("{0} not found. The diamond alignment archive ({2}) may be invalid.\n\
 Please remove or provide a different DAA file or manually construct {1} with\
  \ncmd:\n\tdiamond view -a {3} -f tab -o {1}\nExiting..."\
  	.format(prodigal_output + ".tab", os.path.basename(prodigal_output) + ".tab",
-  		prodigal_daa, os.path.basename(prodigal_daa))
+  		prodigal_daa, os.path.basename(prodigal_daa)))
 	exit(1)
 else:
 	diamond_output = prodigal_output + ".tab"
 
 if not os.path.isfile(prodigal_output + ".lca"):
-	print "Could not find {}. Running lca...".format(prodigal_output + ".lca")
+	print("Could not find {}. Running lca...".format(prodigal_output + ".lca"))
 	blast2lca_output = run_blast2lca(diamond_output,db_dir_path)
 elif os.stat(prodigal_output + ".lca").st_size == 0:
-	print "{} file is empty. Re-running lca...".format(prodigal_output + ".lca")
+	print("{} file is empty. Re-running lca...".format(prodigal_output + ".lca"))
 	blast2lca_output = run_blast2lca(diamond_output,db_dir_path)
 else:
 	blast2lca_output = prodigal_output + ".lca"
 
 taxonomy_table = output_dir + '/taxonomy.tab'
 if not os.path.isfile(taxonomy_table) or os.stat(taxonomy_table).st_size == 0:
-	print "Running add_contig_taxonomy.py... "
+	print("Running add_contig_taxonomy.py... ")
 	if bgcs_dir:
 		taxonomy_table = run_taxonomy(pipeline_path=pipeline_path,
 			assembly_path=filtered_assembly,
@@ -435,4 +435,4 @@ if not single_genome_mode:
 		output_path = output_dir + '/' + kingdom + '.fasta'
 		SeqIO.write(seq_list, output_path, 'fasta')
 
-print "Done!"
+print("Done!")

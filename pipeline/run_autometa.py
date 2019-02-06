@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2018 Ian J. Miller, Evan Rees, Izaak Miller, Jason C. Kwan
 #
@@ -51,8 +51,11 @@ def init_logger(autom_path, db_path, out_path):
 	#Check programs
 	progs = ['md5sum','gzip','tar','gunzip','wget']
 	for prog in progs:
-		prog_version = subprocess.check_output([prog,'--version']).split('\n')[0]
-		logger.info('{}'.format(prog_version))
+		try:
+			prog_version = subprocess.check_output([prog,'--version']).split('\n')[0]
+			logger.info('{}'.format(prog_version))
+		except FileNotFoundError as err:
+			exit('{} is not installed! Install program before proceeding...'.format(prog))
 	#Check 3rd party dependencies
 	dmnd_v = subprocess.check_output(['diamond','version']).strip()
 	logger.info('{}'.format(dmnd_v))
@@ -65,6 +68,7 @@ def init_logger(autom_path, db_path, out_path):
 	for fpath in db_fpaths:
 		logger.info('DB (fname, size): {} {}'.format(fpath, os.stat(db_path+'/'+fpath).st_size))
 	return logger
+
 def run_command(command_string, stdout_path = None):
 	# Function that checks if a command ran properly. If it didn't, then print an error message then quit
 	logger.info('run_autometa.py, run_command: ' + command_string)
@@ -141,12 +145,12 @@ def make_marker_table(fasta):
 	output_fname += '.marker.tab'
 	output_path = output_dir + '/' + output_fname
 	if os.path.isfile(output_path):
-		print "{} file already exists!".format(output_path)
-		print "Continuing to next step..."
+		print("{} file already exists!".format(output_path))
+		print("Continuing to next step...")
 		logger.info('{} file already exists!'.format(output_path))
 		logger.info('Continuing to next step...')
 	else:
-		print "Making the marker table with prodigal and hmmscan. This could take a while..."
+		print("Making the marker table with prodigal and hmmscan. This could take a while...")
 		logger.info('Making the marker table with prodigal and hmmscan. This could take a while...')
 		run_command_quiet("hmmpress -f {}".format(hmm_marker_path))
 		run_command_quiet("{}/make_marker_table.py -a {} -m {} -c {} -o {} -p {}"\
@@ -243,7 +247,7 @@ logger = init_logger(autometa_path, db_dir_path, output_dir)
 
 #check if fasta in path
 if not os.path.isfile(fasta_assembly):
-	print "Could not find {}...".format(fasta_assembly)
+	print("Could not find {}...".format(fasta_assembly))
 	logger.debug('Could not find {}...'.format(fasta_assembly))
 	exit(1)
 
@@ -275,21 +279,21 @@ if taxonomy_table_path and not make_tax_table:
 	combined_table_path = combine_tables(taxonomy_table_path, marker_tab_path)
 elif taxonomy_table_path and make_tax_table:
 	if not os.path.isfile(taxonomy_table_path):
-		print "Could not find {}, running make_taxonomy_table.py".format(taxonomy_table_path)
+		print("Could not find {}, running make_taxonomy_table.py".format(taxonomy_table_path))
 		logger.debug('Could not find {}, running make_taxonomy_table.py'.format(taxonomy_table_path))
 		if not os.path.isfile(pipeline_path+"/lca_functions.so"):
 			cythonize_lca_functions()
 		taxonomy_table_path = run_make_taxonomy_tab(fasta_assembly, length_cutoff)
 		combined_table_path = combine_tables(taxonomy_table_path, marker_tab_path)
 	elif os.path.isfile(taxonomy_table_path) and os.stat(taxonomy_table_path).st_size == 0:
-		print "{} file is empty, running make_taxonomy_table.py".format(taxonomy_table_path)
+		print("{} file is empty, running make_taxonomy_table.py".format(taxonomy_table_path))
 		logger.debug('{} file is empty, running make_taxonomy_table.py'.format(taxonomy_table_path))
 		if not os.path.isfile(pipeline_path+"/lca_functions.so"):
 			cythonize_lca_functions()
 		taxonomy_table_path = run_make_taxonomy_tab(fasta_assembly, length_cutoff)
 		combined_table_path = combine_tables(taxonomy_table_path, marker_tab_path)
 	else:
-		print "{} already exists, not performing make_taxonomy_table.py".format(taxonomy_table_path)
+		print("{} already exists, not performing make_taxonomy_table.py".format(taxonomy_table_path))
 		combined_table_path = combine_tables(taxonomy_table_path, marker_tab_path)
 elif not taxonomy_table_path and make_tax_table:
 	if not os.path.isfile(pipeline_path+"/lca_functions.so"):
@@ -319,8 +323,8 @@ if do_ML_recruitment:
 
 elapsed_time = time.strftime('%H:%M:%S', time.gmtime(round((time.time() - start_time),2)))
 
-print "Done!"
-print "Elapsed time is {} (HH:MM:SS)".format(elapsed_time)
+print("Done!")
+print("Elapsed time is {} (HH:MM:SS)".format(elapsed_time))
 logger.info('Done!')
 logger.info('Elapsed time is {} (HH:MM:SS)'.format(elapsed_time))
 FNULL.close()

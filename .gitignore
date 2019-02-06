@@ -1,0 +1,6 @@
+databases/
+pipeline/*.log
+pipeline/*.c
+pipeline/*.so
+pipeline/build/
+*.log

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2018 Ian J. Miller, Evan Rees, Izaak Miller, Jason C. Kwan
 #
@@ -11,7 +11,7 @@
 #
 # Autometa is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the 
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU Affero General Public License for more details.
 #
 # You should have received a copy of the GNU Affero General Public License
@@ -173,7 +173,7 @@ names_dmp_path = taxdump_dir_path + '/names.dmp'
 nodes_dmp_path = taxdump_dir_path + '/nodes.dmp'
 
 taxids = {}
-print strftime("%Y-%m-%d %H:%M:%S") + ' Processing taxid names'
+print(strftime("%Y-%m-%d %H:%M:%S") + ' Processing taxid names')
 wc_output = subprocess.check_output(['wc', '-l', names_dmp_path])
 wc_list = wc_output.split()
 number_of_lines = int(wc_list[0])
@@ -190,7 +190,7 @@ with open(names_dmp_path) as names_dmp:
 			# line_list[1] = line_list[1].replace(' ', '_')
 			taxids[int(float(line_list[0]))] = { 'name': line_list[1] }
 
-print strftime("%Y-%m-%d %H:%M:%S") + ' Processing taxid nodes'
+print(strftime("%Y-%m-%d %H:%M:%S") + ' Processing taxid nodes')
 wc_output = subprocess.check_output(['wc', '-l', nodes_dmp_path])
 wc_list = wc_output.split()
 number_of_lines = int(wc_list[0])
@@ -214,7 +214,7 @@ with open(nodes_dmp_path) as nodes_dmp:
 #	else:
 #		name_lookup[rank] = { name: taxid }
 
-print strftime("%Y-%m-%d %H:%M:%S") + ' Parsing taxonomy table'
+print(strftime("%Y-%m-%d %H:%M:%S") + ' Parsing taxonomy table')
 #protein_classifications = {} # protein_classifications[contig][rank][taxid] (running total of each thing)
 contig_classifications = {}
 #number_of_proteins = {}
@@ -251,28 +251,28 @@ for i,heading in enumerate(contig_table_first_line_list):
 		column_count[heading] = 1
 
 if contig_index is None:
-	print 'Error, could not find a "contig" column in ' + contig_table_path
+	print('Error, could not find a "contig" column in ' + contig_table_path)
 	sys.exit(2)
 if cluster_index is None and not single_genome_mode:
-	print 'Error, could not find a "cluster" column in ' + contig_table_path
+	print('Error, could not find a "cluster" column in ' + contig_table_path)
 	sys.exit(2)
 if length_index is None:
-	print 'Error, could not find a "length" column in  ' + contig_table_path
+	print('Error, could not find a "length" column in  ' + contig_table_path)
 	sys.exit(2)
 if taxid_index is None:
-	print 'Error, could not find a "taxid" column in ' + contig_table_path
+	print('Error, could not find a "taxid" column in ' + contig_table_path)
 	sys.exit(2)
 if column_count['contig'] > 1:
-	print 'Error, there is more than one "contig" column in ' + contig_table_path
+	print('Error, there is more than one "contig" column in ' + contig_table_path)
 	sys.exit(2)
 if not single_genome_mode and column_count['cluster'] > 1:
-	print 'Error, there is more than one "cluster" column in ' + contig_table_path
+	print('Error, there is more than one "cluster" column in ' + contig_table_path)
 	sys.exit(2)
 if column_count['length'] > 1:
-	print 'Error, there is more than one "length" column in ' + contig_table_path
+	print('Error, there is more than one "length" column in ' + contig_table_path)
 	sys.exit(2)
 if column_count['taxid'] > 1:
-	print 'Error, there is more than one "taxid" column in ' + contig_table_path
+	print('Error, there is more than one "taxid" column in ' + contig_table_path)
 
 for i,line in enumerate(tqdm(contig_table_lines, total=number_of_lines)):
 	if i > 0:
@@ -323,7 +323,7 @@ for i,line in enumerate(tqdm(contig_table_lines, total=number_of_lines)):
 		else:
 			length_of_contigs[contig] = int(float(length))
 
-print strftime("%Y-%m-%d %H:%M:%S") + ' Ranking taxids'
+print(strftime("%Y-%m-%d %H:%M:%S") + ' Ranking taxids')
 top_taxids = {}
 total_clusters = len(contig_classifications)
 
@@ -348,7 +348,7 @@ for cluster in tqdm(contig_classifications, total=total_clusters):
 
 	top_taxids[cluster] = acceptedTaxid
 
-print strftime("%Y-%m-%d %H:%M:%S") + ' Resolving taxon paths'
+print(strftime("%Y-%m-%d %H:%M:%S") + ' Resolving taxon paths')
 taxon_paths = {} # Dictionary of dictionaries, keyed by contig then rank, contains the taxon names
 for cluster in tqdm(top_taxids, total=len(top_taxids)):
 	taxon_paths[cluster] = {}
@@ -364,7 +364,7 @@ for cluster in tqdm(top_taxids, total=len(top_taxids)):
 		if rank not in taxon_paths[cluster]:
 			taxon_paths[cluster][rank] = 'unclassified'
 
-print strftime("%Y-%m-%d %H:%M:%S") + ' Writing table'
+print(strftime("%Y-%m-%d %H:%M:%S") + ' Writing table')
 output_table = open(output_file_path, 'w')
 if single_genome_mode:
 	output_table.write('kingdom\tphylum\tclass\torder\tfamily\tgenus\tspecies\ttaxid\n')
