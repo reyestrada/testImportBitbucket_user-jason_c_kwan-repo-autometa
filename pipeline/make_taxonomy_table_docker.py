@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.7
 
 # Copyright 2018 Ian J. Miller, Evan Rees, Izaak Miller, Jason C. Kwan
 #
@@ -11,7 +11,7 @@
 #
 # Autometa is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the 
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU Affero General Public License for more details.
 #
 # You should have received a copy of the GNU Affero General Public License
@@ -125,7 +125,7 @@ if update:
 
 if single_genome_mode:
 	make_taxonomy_table_command = make_taxonomy_table_command + ' --single_genome'
-	
+
 # Construct Docker run command
 docker_command = 'docker run --volume {}:/output:rw --volume {}:/databases:rw --detach=false --rm jasonkwan/autometa:latest'.format(output_dir_absolute, db_dir_path_absolute)
 

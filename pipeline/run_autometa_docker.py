@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.7
 
 # Copyright 2018 Ian J. Miller, Evan Rees, Izaak Miller, Jason C. Kwan
 #
@@ -11,7 +11,7 @@
 #
 # Autometa is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the 
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU Affero General Public License for more details.
 #
 # You should have received a copy of the GNU Affero General Public License
@@ -97,7 +97,7 @@ if db_dir_path:
 
 #if make_tax_table specified but taxonomy_table_path not defined
 if make_tax_table and not taxonomy_table_path:
-	taxonomy_table_path = output_dir + '/taxonomy.tab' 
+	taxonomy_table_path = output_dir + '/taxonomy.tab'
 
 #If the assembly fasta is not already in the output dir, we need to copy it there so that the docker container can see it
 output_dir_absolute = os.path.abspath(output_dir)
