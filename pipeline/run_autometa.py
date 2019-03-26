@@ -23,9 +23,12 @@ import time
 import logging
 import os
 
+import pandas as pd
+
 from multiprocessing import cpu_count
 from argparse import ArgumentParser
 from argparse import ArgumentDefaultsHelpFormatter
+
 
 def init_logger(autom_path, db_path, out_path):
 	#logger
@@ -65,6 +68,7 @@ def init_logger(autom_path, db_path, out_path):
 	for fpath in db_fpaths:
 		logger.info('DB (fname, size): {} {}'.format(fpath, os.stat(db_path+'/'+fpath).st_size))
 	return logger
+
 def run_command(command_string, stdout_path = None):
 	# Function that checks if a command ran properly. If it didn't, then print an error message then quit
 	logger.info('run_autometa.py, run_command: ' + command_string)
@@ -100,65 +104,98 @@ def cythonize_lca_functions():
 def run_make_taxonomy_tab(fasta, length_cutoff):
 	"""Runs make_taxonomy_table.py and directs output to taxonomy.tab for run_autometa.py"""
 	# Note we don't have to supply the cov_table here because earlier in this script we already run make_contig_table.py
-	output_path = output_dir + '/taxonomy.tab'
+	outfpath = output_dir + '/taxonomy.tab'
+	cmd = ' '.join(['{}/make_taxonomy_table.py'.format(pipeline_path),
+					'-a',fasta,
+					'-db',db_dir_path,
+					'-p',processors,
+					'-l',length_cutoff,
+					'-o',output_dir])
 	if cov_table:
-		run_command("{}/make_taxonomy_table.py -a {} -db {} -p {} -l {} -o {} -v {}".\
-			format(pipeline_path, fasta, db_dir_path, processors, length_cutoff, output_dir, cov_table))
-	else:
-		run_command("{}/make_taxonomy_table.py -a {} -db {} -p {} -l {} -o {}".\
-			format(pipeline_path, fasta, db_dir_path, processors, length_cutoff, output_dir))
-	return output_path
+		cmd += ' '.join(['', '-v', cov_table])
+	run_command(cmd)
+	return outfpath
 
 def length_trim(fasta,length_cutoff):
 	#will need to update path of this perl script
-	outfile_name, ext = os.path.splitext(os.path.basename(fasta))
-	outfile_name += ".filtered" + ext
-	output_path = output_dir + '/' + outfile_name
-	run_command("{}/fasta_length_trim.pl {} {} {}".format(pipeline_path, fasta, length_cutoff,output_path))
+	outfname, ext = os.path.splitext(os.path.basename(fasta))
+	outfname += ".filtered" + ext
+	output_path = os.path.join(output_dir, outfname)
+	cmd = ' '.join(['{}/fasta_length_trim.pl'.format(pipeline_path),
+					fasta,
+					length_cutoff,
+					output_path])
+	run_command(cmd)
 	return output_path
 
-def make_contig_table(fasta, coverage_table=None):
+def make_cov_table(asm_fpath, reads_fpath, dirpath, proc=1):
+	asm_base, _ = os.path.splitext(os.path.basename(asm_fpath))
+	cov_table_fpath = '{0}/{1}.coverage.tab'.format(dirpath,asm_base)
+	cmd = ' '.join(['{}/calculate_read_coverage.py'.format(pipeline_path),
+					'-a',asm_fpath,
+					'-i',reads_fpath,
+					'-p',proc,
+					'-o',dirpath])
+	run_command(cmd)
+	return cov_table_fpath
+
+def make_contig_table(fasta, cov_tab_fpath=None):
 	# Fasta is an absolute path
-	output_filename, _ = os.path.splitext(os.path.basename(fasta))
-	output_filename += '.tab'
-	output_path = output_dir + '/' + output_filename
-	if coverage_table:
-		run_command("{}/make_contig_table.py -a {} -c {} -o {}".format(pipeline_path,fasta,coverage_table,output_path))
-	else:
-		run_command("{}/make_contig_table.py -a {} -o {}".format(pipeline_path,fasta,output_path))
-	return output_path
+	outfname, _ = os.path.splitext(os.path.basename(fasta))
+	outfname += '.tab'
+	outfpath = os.path.join(output_dir, outfname)
+	cmd = ' '.join(['{}/make_contig_table.py'.format(pipeline_path),
+					'-a',fasta,
+					'-o',outfpath])
+	if cov_tab_fpath:
+		cmd += ' '.join(['', '-c', cov_tab_fpath])
+
+	run_command(cmd)
+	return outfpath
 
 def make_marker_table(fasta):
 	if kingdom == 'bacteria':
-		hmm_marker_path = autometa_path + "/single-copy_markers/Bacteria_single_copy.hmm"
-		hmm_cutoffs_path = autometa_path + "/single-copy_markers/Bacteria_single_copy_cutoffs.txt"
+		hmms = 'Bacteria_single_copy.hmm'
+		cutoffs = 'Bacteria_single_copy_cutoffs.txt'
 	elif kingdom == 'archaea':
-		hmm_marker_path = autometa_path + '/single-copy_markers/Archaea_single_copy.hmm'
-		hmm_cutoffs_path = autometa_path + '/single-copy_markers/Archaea_single_copy_cutoffs.txt'
+		hmms = 'Archaea_single_copy.hmm'
+		cutoffs = 'Archaea_single_copy_cutoffs.txt'
 
+	marker_dir = os.path.join(autometa_path, 'single-copy_markers')
+	hmm_marker_path = os.path.join(marker_dir,hmms)
+	hmm_cutoffs_path = os.path.join(marker_dir,cutoffs)
 	#need to add processors to this script
-	output_fname, _ = os.path.splitext(os.path.basename(fasta))
-	output_fname += '.marker.tab'
-	output_path = output_dir + '/' + output_fname
-	if os.path.isfile(output_path):
-		print "{} file already exists!".format(output_path)
+	outfname, _ = os.path.splitext(os.path.basename(fasta))
+	outfname += '.marker.tab'
+	outfpath = os.path.join(output_dir, outfname)
+	if os.path.isfile(outfpath):
+		print "{} file already exists!".format(outfpath)
 		print "Continuing to next step..."
-		logger.info('{} file already exists!'.format(output_path))
+		logger.info('{} file already exists!'.format(outfpath))
 		logger.info('Continuing to next step...')
 	else:
-		print "Making the marker table with prodigal and hmmscan. This could take a while..."
-		logger.info('Making the marker table with prodigal and hmmscan. This could take a while...')
+		print("Making marker tab w/prodigal & hmmscan")
+		logger.info('Making {}: Running prodigal and hmmscan'.format(outfname))
 		run_command_quiet("hmmpress -f {}".format(hmm_marker_path))
-		run_command_quiet("{}/make_marker_table.py -a {} -m {} -c {} -o {} -p {}"\
-		.format(pipeline_path, fasta, hmm_marker_path, hmm_cutoffs_path, output_path, processors))
-	return output_path
+		cmd = ' '.join(['{}/make_marker_table.py'.format(pipeline_path),
+						'-a',fasta,
+						'-m',hmm_marker_path,
+						'-c',hmm_cutoffs_path,
+						'-o',outfpath,
+						'-p',processors])
+		run_command_quiet(cmd)
+	return outfpath
 
 def recursive_dbscan(input_table, filtered_assembly, domain):
 	recursive_dbscan_output_path = output_dir + '/recursive_dbscan_output.tab'
-	k_mer_file = output_dir + '/k-mer_matrix'
-	run_command("{}/recursive_dbscan.py -t {} -a {} -d {} -k {}".format(pipeline_path, input_table, filtered_assembly, output_dir, domain))
-
-	return recursive_dbscan_output_path, k_mer_file
+	kmer_fpath = os.path.join(output_dir,'k-mer_matrix')
+	cmd = ' '.join(['{}/recursive_dbscan.py'.format(pipeline_path),
+					'-t',input_table,
+					'-a',filtered_assembly,
+					'-d',output_dir,
+					'-k',domain])
+	run_command(cmd)
+	return recursive_dbscan_output_path, kmer_fpath
 
 def combine_tables(table1_path, table2_path):
 	comb_table_path = output_dir + '/combined_contig_info.tab'
@@ -196,9 +233,53 @@ def combine_tables(table1_path, table2_path):
 
 def ML_recruitment(input_table, matrix):
 	ML_recruitment_output_path = output_dir + '/ML_recruitment_output.tab'
-	run_command("{}/ML_recruitment.py -t {} -p {} -r -m {} -o {}".format(pipeline_path, input_table, processors, matrix, ML_recruitment_output_path))
-
+	cmd = ' '.join(['{}/ML_recruitment.py'.format(pipeline_path),
+					'-t', input_table,
+					'-p', processors,
+					'-m', matrix,
+					'-o', ML_recruitment_output_path,
+					'-r'])
+	run_command(cmd)
 	return ML_recruitment_output_path
+
+def cami_format(infpath, out_dpath):
+	fpath, ext = os.path.splitext(infpath)
+	master_output = '.'.join([fpath, 'binning'])
+	# "git -C " + autom_path + " branch | grep \* | sed 's/^..//'"
+	branch_command = ' '.join(['git',
+								'-C', autom_path,
+								'branch','|',
+								'grep', '\*' '|',
+								'sed', "'s/^..//'"])
+	branch = subprocess.Popen(branch_command,
+							shell=True,
+							stdout=subprocess.PIPE).communicate()[0].rstrip()
+	commit_command = 'git -C ' + autom_path + ' rev-parse --short HEAD'
+	commit = subprocess.Popen(commit_command,
+							shell=True,
+							stdout=subprocess.PIPE).communicate()[0].rstrip()
+	version = '@Version:Autometa{}{}'.format(branch.upper(),commit)
+	#@Version:AutometaBranchCommit
+	for d in os.path.abspath(out_dpath).split('/'):
+		if 'sample' in d:
+			sampleid = '@SampleID:{}'.format(d)
+			break
+	#@SampleID:SAMPLEID
+	#@@SEQUENCEID\tBINID
+	try:
+		print('using {}'.format(sampleid))
+	except NameError as err:
+		sdir = os.path.basename(os.path.dirname(os.path.abspath(out_dpath)))
+		sid = '{}.autometaRun'.format(sdir)
+	with open(master_output, 'w') as outfile:
+		lines = '\n'.join([version, sid, '@@SEQUENCEID\tBINID\n'])
+		outfile.write(lines)
+	cols = ['contig', 'cluster']
+	df = pd.read_csv(infpath, sep='\t', usecols=cols, index_col='contig')
+	# df.index.rename('SEQUENCEID', inplace=True)
+	# df.rename(columns={'cluster':'BINID'}, inplace=True)
+	df.to_csv(master_output, mode='a', sep='\t', header=False)
+	return master_output
 
 pipeline_path = sys.path[0]
 autometa_path = os.path.dirname(pipeline_path)
@@ -208,6 +289,7 @@ parser = ArgumentParser(description="Script to run the Autometa pipeline.",\
  epilog="Please do not forget to cite us. Thank you for using Autometa!",\
   formatter_class=ArgumentDefaultsHelpFormatter)
 parser.add_argument('-a', '--assembly', metavar='<assembly.fasta>', help='Path to metagenomic assembly fasta', required=True)
+parser.add_argument('-i', '--i_reads', metavar='<reads.fastq[.gz]>', help='/path/to/interleaved/reads', required=False)
 parser.add_argument('-p', '--processors', metavar='<int>', help='Number of processors to use', type=int, default=1)
 parser.add_argument('-l', '--length_cutoff', metavar='<int>', help='Contig length cutoff to consider for binning in bp', default=10000, type=int)
 parser.add_argument('-c', '--completeness_cutoff', metavar='<float>', help='Completeness cutoff (in percent) to use for accepting clusters', type=float, default=20.0)
@@ -225,6 +307,7 @@ args = vars(parser.parse_args())
 
 length_cutoff = args['length_cutoff']
 fasta_assembly = os.path.abspath(args['assembly'])
+i_reads = os.path.abspath(args['i_reads'])
 processors = args['processors']
 cluster_completeness = args['completeness_cutoff']
 kingdom = args['kingdom'].lower()
@@ -237,7 +320,7 @@ cov_table = args['cov_table']
 
 # Make output directory if it doesn't exist
 if not os.path.isdir(output_dir):
-	os.makedirs(output_dir)
+	os.mkdir(output_dir)
 
 logger = init_logger(autometa_path, db_dir_path, output_dir)
 
@@ -249,11 +332,11 @@ if not os.path.isfile(fasta_assembly):
 
 #if make_tax_table specified but taxonomy_table_path not defined
 if make_tax_table and not taxonomy_table_path:
-	taxonomy_table_path = output_dir + '/taxonomy.tab'
+	taxonomy_table_path = os.path.join(output_dir,'taxonomy.tab')
 
 #If coverage table is given, it must exist
 if cov_table and not os.path.isfile(cov_table):
-	print('Error! Could not find coverage table at the following path: ' + cov_table)
+	print('File path not found {}'.format(cov_table))
 	exit(1)
 
 #what input variables were and when you ran it (report fill path based on argparse)
@@ -263,11 +346,21 @@ start_time = time.time()
 FNULL = open(os.devnull, 'w')
 
 #run length trim and store output name
-filtered_assembly = length_trim(fasta_assembly, length_cutoff)
+fname, ext = os.path.splitext(os.path.basename(fasta_assembly))
+filtered_asm_fpath = os.path.join(output_dir,fname)
+filtered_asm_fpath += ".filtered" + ext
+if not os.path.isfile(filtered_asm_fpath):
+	filtered_assembly = length_trim(fasta_assembly, length_cutoff)
+
+# make_cov_table(asm_fpath, reads_fpath, proc=1, dirpath=output_dir)
+if i_reads and not cov_table:
+	cov_table = make_cov_table(filtered_assembly, i_reads, output_dir, processors)
+
 if cov_table:
 	contig_table = make_contig_table(filtered_assembly, cov_table)
 else:
 	contig_table = make_contig_table(filtered_assembly)
+
 marker_tab_path = make_marker_table(filtered_assembly)
 
 # Make combined table
@@ -315,12 +408,15 @@ if make_tax_table:
 recursive_dbscan_output, matrix_file = recursive_dbscan(combined_table_path, filtered_assembly, kingdom)
 
 if do_ML_recruitment:
-	ML_recruitment(recursive_dbscan_output, matrix_file)
+	ml_outfpath = ML_recruitment(recursive_dbscan_output, matrix_file)
 
+master_outfpath = cami_format(ml_outfpath, output_dir)
 elapsed_time = time.strftime('%H:%M:%S', time.gmtime(round((time.time() - start_time),2)))
 
+print('Wrote Binning outfile to {}'.format(master_outfpath))
 print "Done!"
 print "Elapsed time is {} (HH:MM:SS)".format(elapsed_time)
 logger.info('Done!')
 logger.info('Elapsed time is {} (HH:MM:SS)'.format(elapsed_time))
+logger.info('Binning: {}'.format((os.path.abspath(master_outfpath))))
 FNULL.close()

@@ -64,7 +64,7 @@ if coverage_table_path is not None:
 #input_fasta_path = sys.argv[1]
 #output_table_path = sys.argv[2]
 
-output = open( output_table_path, 'w' )
+output = open(output_table_path, 'w')
 
 if no_coverage_mode:
 	output.write('contig\tlength\tgc\n')
