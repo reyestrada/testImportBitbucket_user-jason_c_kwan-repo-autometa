@@ -27,7 +27,7 @@ from Bio import SeqIO
 
 def main():
     usage = 'fasta_length_table.py </path/to/fasta> </path/to/outfile>'
-    if not len(sys.argv) >= 2:
+    if not len(sys.argv) >= 3:
         exit(usage)
     fasta = os.path.abspath(sys.argv[1])
     outfpath = os.path.abspath(sys.argv[2])

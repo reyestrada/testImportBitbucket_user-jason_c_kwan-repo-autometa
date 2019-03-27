@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python2
 
 # Copyright 2018 Ian J. Miller, Evan Rees, Izaak Miller, Jason C. Kwan
 #
@@ -105,37 +105,44 @@ def run_make_taxonomy_tab(fasta, length_cutoff):
 	"""Runs make_taxonomy_table.py and directs output to taxonomy.tab for run_autometa.py"""
 	# Note we don't have to supply the cov_table here because earlier in this script we already run make_contig_table.py
 	outfpath = output_dir + '/taxonomy.tab'
-	cmd = ' '.join(['{}/make_taxonomy_table.py'.format(pipeline_path),
+	cmd = ' '.join(map(str,['{}/make_taxonomy_table.py'.format(pipeline_path),
 					'-a',fasta,
 					'-db',db_dir_path,
 					'-p',processors,
 					'-l',length_cutoff,
-					'-o',output_dir])
+					'-o',output_dir]))
 	if cov_table:
 		cmd += ' '.join(['', '-v', cov_table])
 	run_command(cmd)
 	return outfpath
 
-def length_trim(fasta,length_cutoff):
+def length_trim(fasta, length_cutoff, outfpath=None):
+	assert type(length_cutoff) == int, 'length_cutoff must be an integer value'
+
+	if fasta.endswith('.gz'):
+		fasta_stripped = fasta.rstrip('.gz')
+		outfname, ext = os.path.splitext(os.path.basename(fasta_stripped))
 	#will need to update path of this perl script
-	outfname, ext = os.path.splitext(os.path.basename(fasta))
+	else:
+		outfname, ext = os.path.splitext(os.path.basename(fasta))
+
 	outfname += ".filtered" + ext
 	output_path = os.path.join(output_dir, outfname)
-	cmd = ' '.join(['{}/fasta_length_trim.pl'.format(pipeline_path),
+	cmd = ' '.join(map(str,['{}/fasta_length_trim.py'.format(pipeline_path),
 					fasta,
 					length_cutoff,
-					output_path])
+					output_path]))
 	run_command(cmd)
 	return output_path
 
 def make_cov_table(asm_fpath, reads_fpath, dirpath, proc=1):
 	asm_base, _ = os.path.splitext(os.path.basename(asm_fpath))
 	cov_table_fpath = '{0}/{1}.coverage.tab'.format(dirpath,asm_base)
-	cmd = ' '.join(['{}/calculate_read_coverage.py'.format(pipeline_path),
+	cmd = ' '.join(map(str,['{}/calculate_read_coverage.py'.format(pipeline_path),
 					'-a',asm_fpath,
 					'-i',reads_fpath,
 					'-p',proc,
-					'-o',dirpath])
+					'-o',dirpath]))
 	run_command(cmd)
 	return cov_table_fpath
 
@@ -177,12 +184,12 @@ def make_marker_table(fasta):
 		print("Making marker tab w/prodigal & hmmscan")
 		logger.info('Making {}: Running prodigal and hmmscan'.format(outfname))
 		run_command_quiet("hmmpress -f {}".format(hmm_marker_path))
-		cmd = ' '.join(['{}/make_marker_table.py'.format(pipeline_path),
+		cmd = ' '.join(map(str,['{}/make_marker_table.py'.format(pipeline_path),
 						'-a',fasta,
 						'-m',hmm_marker_path,
 						'-c',hmm_cutoffs_path,
 						'-o',outfpath,
-						'-p',processors])
+						'-p',processors]))
 		run_command_quiet(cmd)
 	return outfpath
 
@@ -233,12 +240,12 @@ def combine_tables(table1_path, table2_path):
 
 def ML_recruitment(input_table, matrix):
 	ML_recruitment_output_path = output_dir + '/ML_recruitment_output.tab'
-	cmd = ' '.join(['{}/ML_recruitment.py'.format(pipeline_path),
+	cmd = ' '.join(map(str,['{}/ML_recruitment.py'.format(pipeline_path),
 					'-t', input_table,
 					'-p', processors,
 					'-m', matrix,
 					'-o', ML_recruitment_output_path,
-					'-r'])
+					'-r']))
 	run_command(cmd)
 	return ML_recruitment_output_path
 
@@ -246,16 +253,16 @@ def cami_format(infpath, out_dpath):
 	fpath, ext = os.path.splitext(infpath)
 	master_output = '.'.join([fpath, 'binning'])
 	# "git -C " + autom_path + " branch | grep \* | sed 's/^..//'"
-	branch_command = ' '.join(['git',
+	cmd = ' '.join(map(str,['git',
 								'-C', autom_path,
 								'branch','|',
 								'grep', '\*' '|',
-								'sed', "'s/^..//'"])
-	branch = subprocess.Popen(branch_command,
+								'sed', "'s/^..//'"]))
+	branch = subprocess.Popen(cmd,
 							shell=True,
 							stdout=subprocess.PIPE).communicate()[0].rstrip()
-	commit_command = 'git -C ' + autom_path + ' rev-parse --short HEAD'
-	commit = subprocess.Popen(commit_command,
+	cmd = 'git -C ' + autom_path + ' rev-parse --short HEAD'
+	commit = subprocess.Popen(cmd,
 							shell=True,
 							stdout=subprocess.PIPE).communicate()[0].rstrip()
 	version = '@Version:Autometa{}{}'.format(branch.upper(),commit)
@@ -289,7 +296,7 @@ parser = ArgumentParser(description="Script to run the Autometa pipeline.",\
  epilog="Please do not forget to cite us. Thank you for using Autometa!",\
   formatter_class=ArgumentDefaultsHelpFormatter)
 parser.add_argument('-a', '--assembly', metavar='<assembly.fasta>', help='Path to metagenomic assembly fasta', required=True)
-parser.add_argument('-i', '--i_reads', metavar='<reads.fastq[.gz]>', help='/path/to/interleaved/reads', required=False)
+parser.add_argument('-i', '--i_reads', metavar='<reads.fastq.gz>', help='/path/to/interleaved/reads', required=False)
 parser.add_argument('-p', '--processors', metavar='<int>', help='Number of processors to use', type=int, default=1)
 parser.add_argument('-l', '--length_cutoff', metavar='<int>', help='Contig length cutoff to consider for binning in bp', default=10000, type=int)
 parser.add_argument('-c', '--completeness_cutoff', metavar='<float>', help='Completeness cutoff (in percent) to use for accepting clusters', type=float, default=20.0)
@@ -346,11 +353,17 @@ start_time = time.time()
 FNULL = open(os.devnull, 'w')
 
 #run length trim and store output name
-fname, ext = os.path.splitext(os.path.basename(fasta_assembly))
+if fasta_assembly.endswith('.gz'):
+	fstripped = fasta_assembly.rstrip('.gz')
+	fname, ext = os.path.splitext(os.path.basename(fstripped))
+else:
+	fname, ext = os.path.splitext(os.path.basename(fasta_assembly))
 filtered_asm_fpath = os.path.join(output_dir,fname)
 filtered_asm_fpath += ".filtered" + ext
 if not os.path.isfile(filtered_asm_fpath):
 	filtered_assembly = length_trim(fasta_assembly, length_cutoff)
+else:
+	filtered_assembly = filtered_asm_fpath
 
 # make_cov_table(asm_fpath, reads_fpath, proc=1, dirpath=output_dir)
 if i_reads and not cov_table:

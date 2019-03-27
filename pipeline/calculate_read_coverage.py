@@ -38,6 +38,8 @@ import argparse
 import subprocess
 import os
 
+from glob import glob
+
 def run_command(command_string, stdout_path = None):
     # Function that checks if a command ran properly. If it didn't, then print an error message then quit
     print('calculate_read_coverage.py, run_command: ' + command_string)
@@ -63,16 +65,18 @@ def run_bowtie2(asm_fpath, reads_fpath, output_dir, num_processors=1):
     run_command(cmd)
     #Run bowtie2 alignment
     sam_outfile = bowtie2_db + '.sam'
-    bt2_cmd = ' '.join(['bowtie2 -x',bowtie2_db,
+    bt2_cmd = ' '.join(map(str,['bowtie2 -x',bowtie2_db,
                         '--interleaved',reads_fpath,
                         '-q',
                         '--phred33',
                         '--very-sensitive',
                         '--no-unal',
-                        '-p',str(num_processors),
-                        '-S',sam_outfile])
+                        '-p',num_processors,
+                        '-S',sam_outfile]))
 
     run_command(bt2_cmd)
+    bt_indices_fpaths = (os.path.abspath(fp) for fp in glob(output_dir+'*.bt2'))
+    for fp in bt_indices_fpaths: os.remove(fp)
     return sam_outfile
 
 def main():
@@ -89,7 +93,7 @@ def main():
     #Check for dependencies in $PATH
     assembly_fpath = os.path.abspath(args['assembly'])
     assembly_bname = os.path.basename(assembly_fpath)
-    i_reads = os.path.abspath(args['i_reads'])
+    i_reads = os.path.abspath(args['ireads'])
     outdir = os.path.abspath(args['outdir'])
     num_proc = str(args['processors'])
     # forward_read_path_list = args['forward_reads']
