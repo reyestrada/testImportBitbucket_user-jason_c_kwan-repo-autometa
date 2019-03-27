@@ -59,7 +59,7 @@ def run_command(command_string, stdout_path = None):
 def run_bowtie2(asm_fpath, reads_fpath, output_dir, num_processors=1):
 	#When "shell = True", need to give one string, not a list
     #Build bowtie2 database
-    asm_bname, ext = os.path.splitext(os.path.basename(asm_fpath))
+    asm_bname, _ = os.path.splitext(os.path.basename(asm_fpath))
     bowtie2_db = os.path.join(output_dir, asm_bname)
     cmd = ' '.join(['bowtie2-build', asm_fpath, bowtie2_db])
     run_command(cmd)
@@ -75,8 +75,6 @@ def run_bowtie2(asm_fpath, reads_fpath, output_dir, num_processors=1):
                         '-S',sam_outfile]))
 
     run_command(bt2_cmd)
-    bt_indices_fpaths = (os.path.abspath(fp) for fp in glob(output_dir+'*.bt2'))
-    for fp in bt_indices_fpaths: os.remove(fp)
     return sam_outfile
 
 def main():
@@ -92,7 +90,7 @@ def main():
 
     #Check for dependencies in $PATH
     assembly_fpath = os.path.abspath(args['assembly'])
-    assembly_bname = os.path.basename(assembly_fpath)
+    assembly_bname, _ = os.path.splitext(os.path.basename(assembly_fpath))
     i_reads = os.path.abspath(args['ireads'])
     outdir = os.path.abspath(args['outdir'])
     num_proc = str(args['processors'])
@@ -117,7 +115,9 @@ def main():
                     'samtools','sort','-o',sorted_bam_fpath])
     run_command(cmd)
 
-    #Clean up the SAM file, which will be a lot larger than the sorted BAM file
+    #Clean up SAM & bt2 indices, SAM is much larger than sorted BAM file
+    bt_indices_fpaths = (os.path.abspath(fp) for fp in glob(os.path.join(outdir,'*.bt2')))
+    for fp in bt_indices_fpaths: os.remove(fp)
     os.remove(samfpath)
 
     #3. Tabulate the average coverage of each contig.
@@ -135,7 +135,7 @@ def main():
     run_command(cmd, genome_bed_fpath)
 
     #Build final table
-    asm_base, ext = os.path.splitext(assembly_bname)
+    asm_base, _ = os.path.splitext(assembly_bname)
     outfile = '{0}/{1}.coverage.tab'.format(outdir, asm_base)
     cmd = ' '.join(['contig_coverage_from_bedtools.pl',genome_bed_fpath])
     run_command(cmd, outfile)

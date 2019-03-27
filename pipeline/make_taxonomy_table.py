@@ -175,62 +175,87 @@ def check_dbs(db_path):
 				This may take some time...'.format(db))
 				update_dbs(db_path, db)
 
-def length_trim(fasta_path,length_cutoff):
-	input_fname, ext = os.path.splitext(os.path.basename(fasta_path))
+def length_trim(fasta_fpath,length_cutoff):
+	input_fname, ext = os.path.splitext(os.path.basename(fasta_fpath))
 	#Trim the length of fasta file
 	outfile_path = output_dir + '/' + input_fname + ".filtered" + ext
 	run_command("{}/fasta_length_trim.pl {} {} {}"\
-	.format(pipeline_path, fasta_path, length_cutoff, outfile_path))
+	.format(pipeline_path, fasta_fpath, length_cutoff, outfile_path))
 	return outfile_path
 
-def run_prodigal(path_to_assembly):
-	assembly_fname, _ = os.path.splitext(os.path.basename(path_to_assembly))
-	output_path = output_dir + '/' + assembly_fname + '.orfs.faa'
-	if os.path.isfile(output_path):
-		print "{} file already exists!".format(output_path)
+def run_prodigal(asm_fpath):
+	assembly_fname, _ = os.path.splitext(os.path.basename(asm_fpath))
+	orfs = '{}.orfs.faa'.format(assembly_fname)
+	txt = '{}.txt'.format(assembly_fname)
+	orf_outfpath = os.path.join(output_dir, orfs)
+	txt_outfpath = os.path.join(output_dir, txt)
+	if os.path.isfile(orf_outfpath):
+		print "{} file already exists!".format(orf_outfpath)
 		print "Continuing to next step..."
 	else:
-		run_command('prodigal -i {} -a {}/{}.orfs.faa -p meta -m -o {}/{}.txt'\
-		.format(path_to_assembly, output_dir, assembly_fname, output_dir, assembly_fname))
+		cmd = ' '.join(['prodigal',
+						'-i',asm_fpath,
+						'-a',orf_outfpath,
+						'-p','meta',
+						'-m',
+						'-o',txt_outfpath])
+		run_command(cmd)
 
-def run_diamond(prodigal_output, diamond_db_path, num_processors, prodigal_daa):
-	view_output = prodigal_output + ".tab"
-	tmp_dir_path = os.path.dirname(prodigal_output) + '/tmp'
-	if not os.path.isdir(tmp_dir_path):
-		os.makedirs(tmp_dir_path) # This will give an error if the path exists but is a file instead of a dir
+def run_diamond(orfs_infpath, dmnd_db_fpath, processors, daa_outfpath):
+	dmnd_outfpath = orfs_infpath + ".tab"
+	tmp_dirpath = os.path.dirname(orfs_infpath) + '/tmp'
+	if not os.path.isdir(tmp_dirpath):
+		# This will give an error if the path exists but is a file instead of a dir
+		os.makedirs(tmp_dirpath)
+
+	cmd = ' '.join(map(str,['diamond','blastp',
+							'--query','{}.faa'.format(orfs_infpath),
+							'--db',dmnd_db_fpath,
+							'--evalue','1e-5',
+							'--max-target-seqs','200',
+							'-p',processors,
+							'--daa',daa_outfpath,
+							'-t',tmp_dirpath]))
+
 	error = run_command_return("diamond blastp --query {0}.faa --db {1} \
 	--evalue 1e-5 --max-target-seqs 200 -p {2} --daa {3} -t {4}"\
-	.format(prodigal_output, diamond_db_path, num_processors, prodigal_daa, tmp_dir_path))
-	# If there is an error, attempt to rebuild NR
+	.format(orfs_infpath, dmnd_db_fpath, processors, daa_outfpath, tmp_dirpath))
+	# If there is an error, chunk fasta or attempt to rebuild NR
 	if error == 134 or error == str(134):
 		print('Fatal: Not enough disk space for diamond alignment archive!')
+		# TODO: split_fasta and search
 		exit(1)
 	if error:
-		print('Error when performing diamond blastp:\n{}\nAttempting to correct by rebuilding nr...'.format(error))
-		update_dbs(db_dir_path, 'nr')
-		run_command("diamond blastp --query {0}.faa --db {1} --evalue 1e-5 \
-		--max-target-seqs 200 -p {2} --daa {3} -t {4}"\
-		.format(prodigal_output, diamond_db_path, num_processors, prodigal_daa, tmp_dir_path))
+		print('Error:(diamond blastp)\n{}\nRebuilding nr...'.format(error))
+		# update_dbs(db_dir_path, 'nr')
+		run_command(cmd)
 
-	run_command("diamond view -a {} -f tab -o {}".format(prodigal_daa, view_output))
+	cmd = ' '.join(['diamond','view',
+					'-a',daa_outfpath,
+					'-f','tab',
+					'-o',dmnd_outfpath])
 
-	return view_output
+	run_command(cmd)
+	return dmnd_outfpath
 
 #blast2lca using accession numbers#
 def run_blast2lca(input_file, taxdump_path):
-	fname = os.path.splitext(os.path.basename(input_file))[0] + ".lca"
-	output = '/'.join([output_dir, fname])
-	if os.path.isfile(output) and not os.stat(output).st_size == 0:
-		print "{} file already exists! Continuing to next step...".format(output)
+	fname, _ = os.path.splitext(os.path.basename(input_file))
+	fname += '.lca'
+	outfpath = os.path.join(output_dir, fname)
+	if os.path.isfile(outfpath) and not os.stat(outfpath).st_size == 0:
+		print "{} file already exists! Continuing to next step...".format(outfpath)
 	else:
-		run_command("{0}/lca.py database_directory {1} {2}"\
-			.format(pipeline_path, db_dir_path, input_file))
-	return output
+		cmd = ' '.join(['{}/lca.py'.format(pipeline_path),
+						'database_directory', db_dir_path,
+						input_file])
+		run_command(cmd)
+	return outfpath
 
 def run_taxonomy(pipeline_path, assembly_path, tax_table_path, db_dir_path,
 		coverage_table, bgcs_path=None, orfs_path=None): #Have to update this
 	assembly_fname, _ = os.path.splitext(os.path.basename(assembly_path))
-	initial_table_path = output_dir + '/' + assembly_fname + '.tab'
+	initial_table_path = os.path.join(output_dir, assembly_fname+'.tab')
 
 	# Only make the contig table if it doesn't already exist
 	if not os.path.isfile(initial_table_path):
@@ -293,14 +318,24 @@ db_dir_path = os.path.abspath(args['db_dir'])
 usr_prot_path = args['user_prot_db']
 num_processors = args['processors']
 length_cutoff = args['length_cutoff']
-fasta_path = args['assembly']
 cov_table = args['cov_table']
 output_dir = args['output_dir']
 single_genome_mode = args['single_genome']
 bgcs_dir = args['bgcs_dir']
-fasta_fname, _ = os.path.splitext(os.path.basename(fasta_path))
-prodigal_output = '/'.join([output_dir, fasta_fname + ".filtered.orfs"])
-prodigal_daa = prodigal_output + ".daa"
+
+fasta_fpath = args['assembly']
+if fasta_fpath.endswith('.gz'):
+	fasta_stripped = fasta_fpath.rstrip('.gz')
+	fasta_fname, ext = os.path.splitext(os.path.basename(fasta_stripped))
+else:
+	fasta_fname, ext = os.path.splitext(os.path.basename(fasta_fpath))
+
+filtered_asm_fpath = os.path.join(output_dir, fasta_fname+'.filtered'+ext)
+orfs_basepath = os.path.join(output_dir, fasta_fname+'.filtered.orfs')
+prodigal_outfpath = '{}.faa'.format(orfs_basepath)
+dmnd_daa_fpath = '{}.daa'.format(orfs_basepath)
+dmnd_tab_fpath = '{}.tab'.format(orfs_basepath)
+lca_fpath = '{}.lca'.format(orfs_basepath)
 
 # If cov_table defined, we need to check the file exists
 if cov_table:
@@ -312,15 +347,15 @@ if cov_table:
 if not os.path.isdir(output_dir):
 	os.makedirs(output_dir)
 
-if not os.path.isfile(pipeline_path+"/lca_functions.so"):
-	cythonize_lca_functions()
+# if not os.path.isfile(pipeline_path+"/lca_functions.so"):
+# 	cythonize_lca_functions()
 
-if not os.path.isdir(db_dir_path):
-	#Verify the 'Autometa databases' directory exists
-	print('No databases directory found, creating and populating AutoMeta databases directory\n\
-	This may take some time...')
-	os.mkdir(db_dir_path)
-	update_dbs(db_dir_path)
+# if not os.path.isdir(db_dir_path):
+# 	#Verify the 'Autometa databases' directory exists
+# 	print('No databases directory found, creating and populating AutoMeta databases directory\n\
+# 	This may take some time...')
+	# os.mkdir(db_dir_path)
+	# update_dbs(db_dir_path)
 elif not os.listdir(db_dir_path):
 	#The 'Autometa databases' directory is empty
 	print('AutoMeta databases directory empty, populating with appropriate databases.\n\
@@ -333,74 +368,77 @@ names_dmp_path = db_dir_path + '/names.dmp'
 nodes_dmp_path = db_dir_path + '/nodes.dmp'
 accession2taxid_path = db_dir_path + '/prot.accession2taxid'
 diamond_db_path = db_dir_path + '/nr.dmnd'
-current_taxdump_md5 = db_dir_path + '/taxdump.tar.gz.md5'
-current_acc2taxid_md5 = db_dir_path + '/prot.accession2taxid.gz.md5'
-current_nr_md5 = db_dir_path + '/nr.gz.md5'
+# current_taxdump_md5 = db_dir_path + '/taxdump.tar.gz.md5'
+# current_acc2taxid_md5 = db_dir_path + '/prot.accession2taxid.gz.md5'
+# current_nr_md5 = db_dir_path + '/nr.gz.md5'
 
-if usr_prot_path:
-	usr_prot_path = os.path.abspath(usr_prot_path)
-	if os.path.isdir(usr_prot_path):
-		print('You have provided a directory {}. \
-		--user_prot_db requires a file path.'.format(usr_prot_path))
-		exit(1)
-	elif not os.path.isfile(usr_prot_path):
-		print('{} is not a file.'.format(usr_prot_path))
-		exit(1)
-	else:
-		diamond_db_path = usr_prot_path
+# if usr_prot_path:
+# 	usr_prot_path = os.path.abspath(usr_prot_path)
+# 	if os.path.isdir(usr_prot_path):
+# 		print('You have provided a directory {}. \
+# 		--user_prot_db requires a file path.'.format(usr_prot_path))
+# 		exit(1)
+# 	elif not os.path.isfile(usr_prot_path):
+# 		print('{} is not a file.'.format(usr_prot_path))
+# 		exit(1)
+# 	else:
+# 		diamond_db_path = usr_prot_path
 
-if args['update']:
-	print("Checking database directory for updates")
-	update_dbs(db_dir_path, 'all')
+# if args['update']:
+# 	print("Checking database directory for updates")
+# 	update_dbs(db_dir_path, 'all')
 
-filtered_assembly = output_dir + '/' + fasta_fname + ".filtered.fasta"
-if not os.path.isfile(filtered_assembly):
-	filtered_assembly = length_trim(fasta_path, length_cutoff)
+if not os.path.isfile(filtered_asm_fpath):
+	filtered_asm_fpath = length_trim(fasta_fpath, length_cutoff)
 
-if not os.path.isfile(prodigal_output + ".faa"):
+if not os.path.isfile(prodigal_outfpath):
 	print "Prodigal output not found. Running prodigal..."
 	#Check for file and if it doesn't exist run make_marker_table
-	run_prodigal(filtered_assembly)
+	run_prodigal(filtered_asm_fpath)
 
-if not os.path.isfile(prodigal_daa):
-	print "Could not find {}. Running diamond blast... ".format(prodigal_daa)
-	diamond_output = run_diamond(prodigal_output, diamond_db_path, num_processors, prodigal_daa)
-elif os.stat(prodigal_output + ".daa").st_size == 0:
-	print "{} file is empty. Re-running diamond blast...".format(prodigal_daa)
-	diamond_output = run_diamond(prodigal_output, diamond_db_path, num_processors, prodigal_daa)
-elif not os.path.isfile(prodigal_output + ".tab"):
-	print "{0} not found. The diamond alignment archive ({2}) may be invalid.\n\
+dmd_daa_err = "{0} not found. The diamond alignment archive ({2}) may be invalid.\n\
 Please remove or provide a different DAA file or manually construct {1} with\
- \ncmd:\n\tdiamond view -a {3} -f tab -o {1}\nExiting..."\
- 	.format(prodigal_output + ".tab", os.path.basename(prodigal_output) + ".tab",
-  		prodigal_daa, os.path.basename(prodigal_daa))
+\ncmd:\n\tdiamond view -a {3} -f tab -o {1}\nExiting..."\
+.format(dmnd_tab_fpath,
+		os.path.basename(orfs_basepath)+'.tab',
+		dmnd_daa_fpath,
+		os.path.basename(dmnd_daa_fpath))
+
+if not os.path.isfile(dmnd_daa_fpath):
+	print "Could not find {}. Running diamond blast... ".format(dmnd_daa_fpath)
+	diamond_output = run_diamond(orfs_basepath, diamond_db_path, num_processors, dmnd_daa_fpath)
+elif os.stat(dmnd_daa_fpath).st_size == 0:
+	print "{} file is empty. Re-running diamond blast...".format(dmnd_daa_fpath)
+	diamond_output = run_diamond(orfs_basepath, diamond_db_path, num_processors, dmnd_daa_fpath)
+elif not os.path.isfile(dmnd_tab_fpath):
+	print(dmd_daa_err)
 	exit(1)
 else:
-	diamond_output = prodigal_output + ".tab"
+	diamond_output = dmnd_tab_fpath
 
-if not os.path.isfile(prodigal_output + ".lca"):
-	print "Could not find {}. Running lca...".format(prodigal_output + ".lca")
+if not os.path.isfile(lca_fpath):
+	print "Could not find {}. Running lca...".format(lca_fpath)
 	blast2lca_output = run_blast2lca(diamond_output,db_dir_path)
-elif os.stat(prodigal_output + ".lca").st_size == 0:
-	print "{} file is empty. Re-running lca...".format(prodigal_output + ".lca")
+elif os.stat(lca_fpath).st_size == 0:
+	print "{} file is empty. Re-running lca...".format(lca_fpath)
 	blast2lca_output = run_blast2lca(diamond_output,db_dir_path)
 else:
-	blast2lca_output = prodigal_output + ".lca"
+	blast2lca_output = lca_fpath
 
-taxonomy_table = output_dir + '/taxonomy.tab'
+taxonomy_table = os.path.join(output_dir, 'taxonomy.tab')
 if not os.path.isfile(taxonomy_table) or os.stat(taxonomy_table).st_size == 0:
 	print "Running add_contig_taxonomy.py... "
 	if bgcs_dir:
 		taxonomy_table = run_taxonomy(pipeline_path=pipeline_path,
-			assembly_path=filtered_assembly,
+			assembly_path=filtered_asm_fpath,
 			tax_table_path=blast2lca_output,
 			db_dir_path=db_dir_path,
 			coverage_table=cov_table,
 			bgcs_path=bgcs_dir,
-			orfs_path=prodigal_output + '.faa')
+			orfs_path=prodigal_outfpath)
 	else:
 		taxonomy_table = run_taxonomy(pipeline_path=pipeline_path,
-			assembly_path=filtered_assembly,
+			assembly_path=filtered_asm_fpath,
 			tax_table_path=blast2lca_output,
 			db_dir_path=db_dir_path,
 			coverage_table=cov_table)
@@ -408,15 +446,13 @@ else:
 	print('taxonomy.tab exists... Splitting original contigs into kingdoms')
 
 # Split the original contigs into sets for each kingdom
-taxonomy_pd = pd.read_table(taxonomy_table)
+taxonomy_df = pd.read_table(taxonomy_table)
 categorized_seq_objects = {}
-all_seq_records = {}
 
 # Load fasta file
-for seq_record in SeqIO.parse(filtered_assembly, 'fasta'):
-	all_seq_records[seq_record.id] = seq_record
+all_seq_records = SeqIO.to_dict(SeqIO.parse(filtered_asm_fpath, 'fasta'))
 
-for i, row in taxonomy_pd.iterrows():
+for i, row in taxonomy_df.iterrows():
 	kingdom = row['kingdom']
 	contig = row['contig']
 	if contig not in all_seq_records:
@@ -432,7 +468,7 @@ for i, row in taxonomy_pd.iterrows():
 if not single_genome_mode:
 	for kingdom in categorized_seq_objects:
 		seq_list = categorized_seq_objects[kingdom]
-		output_path = output_dir + '/' + kingdom + '.fasta'
-		SeqIO.write(seq_list, output_path, 'fasta')
+		outfpath = os.path.join(output_dir, '{}.fasta'.format(kingdom))
+		SeqIO.write(seq_list, outfpath, 'fasta')
 
 print "Done!"
