@@ -100,37 +100,37 @@ def Extract_blast(blast_file, bitscore_filter=0.9):
                 temp_orf_list = [orf]
     return(blast_dict)
 
-def Convert_accession2taxid(accession2taxid_dict, blast_dict):
+def Convert_accession2taxid(acc2taxid_dict, blast_dict):
     "Returns dictionary of orfs with set of their associated tax ids converted from accesssion numbers and accession.version numbers"
     blast_taxids = dict()
     for orf in blast_dict.iterkeys():
         blast_taxids[orf]=set()
         for accession_number in blast_dict[orf].__iter__():
-            if accession_number in accession2taxid_dict.viewkeys():
-                blast_taxids[orf].add(int(accession2taxid_dict.get(accession_number)))
+            if accession_number in acc2taxid_dict.viewkeys():
+                blast_taxids[orf].add(int(acc2taxid_dict.get(accession_number)))
     return(blast_taxids)
 
 def Process_accession2taxid_file(acc2taxid_fpath, blast_dict):
     "Returns dictionary of accession numbers and accession.version with their associated tax ids"
-    accession2taxid_dict = dict()
+    acc2taxid_dict = dict()
     accession_set = set(chain.from_iterable(blast_dict.values()))
+
     if acc2taxid_fpath.endswith('.gz'):
         fh = gzip.open(acc2taxid_fpath)
     else:
         fh = open(acc2taxid_fpath)
+    header = fh.readline()
     for line in fh:
-        pattern = re.search(r'(\S+)\s+(\S+)\s+(\d+)\s+\S+', line)
-        if pattern:
-            accession_number = pattern.group(1)
-            accession_version = pattern.group(2)
-            if accession_number in accession_set:
-                taxid = int(pattern.group(3))
-                accession2taxid_dict[accession_number]=taxid
-            elif accession_version in accession_set:
-                taxid = int(pattern.group(3))
-                accession2taxid_dict[accession_version]=taxid
+        acc_num, acc_ver, taxid, _ = line.split('\t')
+        taxid = int(taxid)
+        if acc_num in accession_set:
+            acc2taxid_dict.update({acc_num:taxid})
+            # acc2taxid_dict[acc_num]=taxid
+        elif acc_ver in accession_set:
+            acc2taxid_dict.update({acc_ver:taxid})
+            # acc2taxid_dict[acc_ver]=taxid
     fh.close()
-    return(accession2taxid_dict)
+    return(acc2taxid_dict)
 
 #Empty data structures used for RangeMinQuery
 tour=list()

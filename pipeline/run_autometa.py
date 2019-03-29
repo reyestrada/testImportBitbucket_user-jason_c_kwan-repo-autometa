@@ -254,18 +254,18 @@ def cami_format(infpath, out_dpath):
 	master_output = '.'.join([fpath, 'binning'])
 	# "git -C " + autom_path + " branch | grep \* | sed 's/^..//'"
 	cmd = ' '.join(map(str,['git',
-								'-C', autom_path,
+								'-C', autometa_path,
 								'branch','|',
 								'grep', '\*' '|',
 								'sed', "'s/^..//'"]))
 	branch = subprocess.Popen(cmd,
 							shell=True,
 							stdout=subprocess.PIPE).communicate()[0].rstrip()
-	cmd = 'git -C ' + autom_path + ' rev-parse --short HEAD'
+	cmd = 'git -C ' + autometa_path + ' rev-parse --short HEAD'
 	commit = subprocess.Popen(cmd,
 							shell=True,
 							stdout=subprocess.PIPE).communicate()[0].rstrip()
-	version = '@Version:Autometa{}{}'.format(branch.upper(),commit)
+	version = '@Version:Autometa.{}.{}'.format(branch.upper(),commit)
 	#@Version:AutometaBranchCommit
 	for d in os.path.abspath(out_dpath).split('/'):
 		if 'sample' in d:
@@ -277,7 +277,7 @@ def cami_format(infpath, out_dpath):
 		print('using {}'.format(sampleid))
 	except NameError as err:
 		sdir = os.path.basename(os.path.dirname(os.path.abspath(out_dpath)))
-		sid = '{}.autometaRun'.format(sdir)
+		sid = '@SampleID:{}.autometaRun'.format(sdir)
 	with open(master_output, 'w') as outfile:
 		lines = '\n'.join([version, sid, '@@SEQUENCEID\tBINID\n'])
 		outfile.write(lines)
@@ -314,7 +314,7 @@ args = vars(parser.parse_args())
 
 length_cutoff = args['length_cutoff']
 fasta_assembly = os.path.abspath(args['assembly'])
-i_reads = os.path.abspath(args['i_reads'])
+i_reads = args['i_reads']
 processors = args['processors']
 cluster_completeness = args['completeness_cutoff']
 kingdom = args['kingdom'].lower()
@@ -367,6 +367,7 @@ else:
 
 # make_cov_table(asm_fpath, reads_fpath, proc=1, dirpath=output_dir)
 if i_reads and not cov_table:
+	i_reads = os.path.abspath(i_reads)
 	cov_table = make_cov_table(filtered_assembly, i_reads, output_dir, processors)
 
 if cov_table:

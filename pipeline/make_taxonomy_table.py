@@ -164,7 +164,7 @@ def check_dbs(db_path):
 	else:
 		db_dict = {
 			'nr': ['nr.dmnd'],
-			'acc2taxid': ['prot.accession2taxid'],
+			'acc2taxid': ['prot.accession2taxid.gz'],
 			'taxdump': ['names.dmp','nodes.dmp']
 			}
 	db_files = os.listdir(db_path)
@@ -175,12 +175,16 @@ def check_dbs(db_path):
 				This may take some time...'.format(db))
 				update_dbs(db_path, db)
 
-def length_trim(fasta_fpath,length_cutoff):
+def length_trim(fasta_fpath, length_cutoff, outdir):
 	input_fname, ext = os.path.splitext(os.path.basename(fasta_fpath))
 	#Trim the length of fasta file
-	outfile_path = output_dir + '/' + input_fname + ".filtered" + ext
-	run_command("{}/fasta_length_trim.pl {} {} {}"\
-	.format(pipeline_path, fasta_fpath, length_cutoff, outfile_path))
+	outfp = '{}.filtered{}'.format(input_fname, ext)
+	outfile_path = os.path.join(outdir, outfp)
+	cmd = ' '.join(map(str,['{}/fasta_length_trim.py'.format(pipeline_path),
+							fasta_fpath,
+							length_cutoff,
+							outfile_path]))
+	run_command(cmd)
 	return outfile_path
 
 def run_prodigal(asm_fpath):
@@ -192,17 +196,21 @@ def run_prodigal(asm_fpath):
 	if os.path.isfile(orf_outfpath):
 		print "{} file already exists!".format(orf_outfpath)
 		print "Continuing to next step..."
-	else:
-		cmd = ' '.join(['prodigal',
-						'-i',asm_fpath,
-						'-a',orf_outfpath,
-						'-p','meta',
-						'-m',
-						'-o',txt_outfpath])
-		run_command(cmd)
+		return(orf_outfpath)
+	cmd = ' '.join(['prodigal',
+					'-i',asm_fpath,
+					'-a',orf_outfpath,
+					'-p','meta',
+					'-m',
+					'-o',txt_outfpath])
+	run_command(cmd)
+	return(orf_outfpath)
+
+# def run_dmnd_subsets(fasta_fp, ):
+# 	pass
 
 def run_diamond(orfs_infpath, dmnd_db_fpath, processors, daa_outfpath):
-	dmnd_outfpath = orfs_infpath + ".tab"
+	dmnd_outfpath = orfs_infpath + '.tab'
 	tmp_dirpath = os.path.dirname(orfs_infpath) + '/tmp'
 	if not os.path.isdir(tmp_dirpath):
 		# This will give an error if the path exists but is a file instead of a dir
@@ -217,18 +225,18 @@ def run_diamond(orfs_infpath, dmnd_db_fpath, processors, daa_outfpath):
 							'--daa',daa_outfpath,
 							'-t',tmp_dirpath]))
 
-	error = run_command_return("diamond blastp --query {0}.faa --db {1} \
-	--evalue 1e-5 --max-target-seqs 200 -p {2} --daa {3} -t {4}"\
-	.format(orfs_infpath, dmnd_db_fpath, processors, daa_outfpath, tmp_dirpath))
+	error = run_command_return(cmd)
 	# If there is an error, chunk fasta or attempt to rebuild NR
 	if error == 134 or error == str(134):
 		print('Fatal: Not enough disk space for diamond alignment archive!')
 		# TODO: split_fasta and search
+		# run_dmnd_subsets(orfs_infpath)
 		exit(1)
 	if error:
-		print('Error:(diamond blastp)\n{}\nRebuilding nr...'.format(error))
+		# print('Error:(diamond blastp)\n{}\nRebuilding nr...'.format(error))
 		# update_dbs(db_dir_path, 'nr')
-		run_command(cmd)
+		# run_command(cmd)
+		exit(1)
 
 	cmd = ' '.join(['diamond','view',
 					'-a',daa_outfpath,
@@ -356,13 +364,13 @@ if not os.path.isdir(output_dir):
 # 	This may take some time...')
 	# os.mkdir(db_dir_path)
 	# update_dbs(db_dir_path)
-elif not os.listdir(db_dir_path):
-	#The 'Autometa databases' directory is empty
-	print('AutoMeta databases directory empty, populating with appropriate databases.\n\
-	This may take some time...')
-	update_dbs(db_dir_path)
-else:
-	check_dbs(db_dir_path)
+# elif not os.listdir(db_dir_path):
+# 	#The 'Autometa databases' directory is empty
+# 	print('AutoMeta databases directory empty, populating with appropriate databases.\n\
+# 	This may take some time...')
+# 	update_dbs(db_dir_path)
+# else:
+# 	check_dbs(db_dir_path)
 
 names_dmp_path = db_dir_path + '/names.dmp'
 nodes_dmp_path = db_dir_path + '/nodes.dmp'
@@ -389,18 +397,17 @@ diamond_db_path = db_dir_path + '/nr.dmnd'
 # 	update_dbs(db_dir_path, 'all')
 
 if not os.path.isfile(filtered_asm_fpath):
-	filtered_asm_fpath = length_trim(fasta_fpath, length_cutoff)
+	filtered_asm_fpath = length_trim(fasta_fpath, length_cutoff, output_dir)
 
 if not os.path.isfile(prodigal_outfpath):
 	print "Prodigal output not found. Running prodigal..."
 	#Check for file and if it doesn't exist run make_marker_table
 	run_prodigal(filtered_asm_fpath)
 
-dmd_daa_err = "{0} not found. The diamond alignment archive ({2}) may be invalid.\n\
-Please remove or provide a different DAA file or manually construct {1} with\
-\ncmd:\n\tdiamond view -a {3} -f tab -o {1}\nExiting..."\
+dmd_daa_err = "{0} not found. The diamond alignment archive ({1}) may be invalid.\n\
+Please remove or provide a different DAA file or manually construct {0} with\
+\ncmd:\n\tdiamond view -a {2} -f tab -o {0}\nExiting..."\
 .format(dmnd_tab_fpath,
-		os.path.basename(orfs_basepath)+'.tab',
 		dmnd_daa_fpath,
 		os.path.basename(dmnd_daa_fpath))
 
