@@ -516,7 +516,7 @@ for i, row in master_table.iterrows():
 
 
 completeness_cutoff = 20
-purity_cutoff = 90
+purity_cutoff = 95
 round_counter = 0
 global_cluster_info = {}
 local_current_table = copy.deepcopy(master_table)
