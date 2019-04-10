@@ -240,10 +240,10 @@ def countClusters(pandas_table):
 
 # See https://stackoverflow.com/questions/2413522/weighted-standard-deviation-in-numpy
 def weighted_av_and_stdev(values, weights):
-	value_array = numpy.asarray(values)
-	weight_array = numpy.asarray(weights)
-	average = numpy.average(value_array, weights=weight_array)
-	variance = numpy.average((value_array - average)**2, weights=weight_array)
+	value_array = np.asarray(values)
+	weight_array = np.asarray(weights)
+	average = np.average(value_array, weights=weight_array)
+	variance = np.average((value_array - average)**2, weights=weight_array)
 	return(average, math.sqrt(variance))
 
 def getClusterInfo(pandas_table, hmm_dictionary, life_domain):
