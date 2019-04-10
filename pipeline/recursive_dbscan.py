@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with Autometa. If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import division
 import pandas as pd
 from sklearn.cluster import DBSCAN
 from scipy import stats
@@ -114,7 +115,9 @@ def runDBSCANs(table, dimensions, hmm_dictionary, domain, completeness_cutoff, p
 		for cluster in cluster_info:
 			completeness = cluster_info[cluster]['completeness']
 			purity = cluster_info[cluster]['purity']
-			if completeness > completeness_cutoff and purity > purity_cutoff:
+			gc_sdpc = cluster_info[cluster]['gc_sdpc']
+			cov_sdpc = cluster_info[cluster]['cov_sdpc']
+			if completeness > completeness_cutoff and purity > purity_cutoff and gc_sdpc < gc_sdpc_cutoff and cov_sdpc < cov_sdpc_cutoff:
 				completenessList.append(completeness)
 		if completenessList:
 			current_median = np.median(completenessList)
@@ -166,6 +169,8 @@ def runDBSCANs(table, dimensions, hmm_dictionary, domain, completeness_cutoff, p
 	for cluster in best_cluster_info:
 		completeness = best_cluster_info[cluster]['completeness']
 		purity = best_cluster_info[cluster]['purity']
+		gc_sdpc = best_cluster_info[cluster]['gc_sdpc']
+		cov_sdpc = best_cluster_info[cluster]['cov_sdpc']
 
 		# Explicitly remove the noise cluster (-1)
 		# Note: in the R DBSCAN implementation, the noise cluster is 0, in the sklearn implementation, the noise cluster is -1
@@ -173,7 +178,7 @@ def runDBSCANs(table, dimensions, hmm_dictionary, domain, completeness_cutoff, p
 			other_clusters[cluster] = 1
 			continue
 
-		if completeness > completeness_cutoff and purity > purity_cutoff:
+		if completeness > completeness_cutoff and purity > purity_cutoff and gc_sdpc < gc_sdpc_cutoff and cov_sdpc < cov_sdpc_cutoff:
 			complete_and_pure_clusters[cluster] = 1
 		else:
 			other_clusters[cluster] = 1
@@ -233,13 +238,34 @@ def countClusters(pandas_table):
 	number_of_clusters = len(list(clusters.keys()))
 	return number_of_clusters
 
+# See https://stackoverflow.com/questions/2413522/weighted-standard-deviation-in-numpy
+def weighted_av_and_stdev(values, weights):
+	value_array = numpy.asarray(values)
+	weight_array = numpy.asarray(weights)
+	average = numpy.average(value_array, weights=weight_array)
+	variance = numpy.average((value_array - average)**2, weights=weight_array)
+	return(average, math.sqrt(variance))
+
 def getClusterInfo(pandas_table, hmm_dictionary, life_domain):
 	marker_totals = {}
+	coverages = dict() # Keyed by bin, holds lists of coverages
+	gc_percents = dict() # Keyed by bin, holds lists of gc_percents
+	lengths = dict() # Keyed by bin, holds lists of contig lengths (to provide weights for averages)
 	for i, row in pandas_table.iterrows():
 		contig = row['contig']
 		cluster = row['db_cluster']
+		cov = row['cov']
+		gc = row['gc']
+		length = row['length']
 		if cluster not in marker_totals:
 			marker_totals[cluster] = {}
+			coverages[cluster] = list()
+			gc_percents[cluster] = list()
+			lengths[cluster] = list()
+
+		coverages[cluster].append(cov)
+		gc_percents[cluster].append(gc)
+		lengths[cluster].append(length)
 
 		if contig not in hmm_dictionary:
 			continue
@@ -273,6 +299,26 @@ def getClusterInfo(pandas_table, hmm_dictionary, life_domain):
 			purity = (float(num_single_copy_markers) / total_unique_markers) * 100
 
 		cluster_details[cluster] = { 'completeness': completeness, 'purity': purity }
+
+	# Make weight lists for average/stdev
+	contig_weights = dict()
+
+	for cluster in lengths:
+		total_length = sum(lengths[cluster])
+		fraction_list = []
+		for length in lengths[cluster]:
+			fraction_list.append(length / total_length)
+		contig_weights[bin_name] = fraction_list
+
+	for cluster in cluster_details:
+		( gc_av, gc_stdev ) = weighted_av_and_stdev(gc_percents[cluster], contig_weights[cluster])
+		( cov_av, cov_stdev ) = weighted_av_and_stdev(coverages[cluster], contig_weights[cluster])
+
+		gc_sdpc = (gc_stdev / gc_av)*100
+		cov_sdpc = (cov_stdev / cov_av)*100
+
+		cluster_details[cluster]['gc_sdpc'] = gc_sdpc
+		cluster_details[cluster]['cov_sdpc'] = cov_sdpc
 
 	return cluster_details
 
@@ -517,6 +563,8 @@ for i, row in master_table.iterrows():
 
 completeness_cutoff = 20
 purity_cutoff = 95
+gc_sdpc_cutoff = 5
+cov_sdpc_cutoff = 25
 round_counter = 0
 global_cluster_info = {}
 local_current_table = copy.deepcopy(master_table)
