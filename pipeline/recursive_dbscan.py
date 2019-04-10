@@ -308,7 +308,7 @@ def getClusterInfo(pandas_table, hmm_dictionary, life_domain):
 		fraction_list = []
 		for length in lengths[cluster]:
 			fraction_list.append(length / total_length)
-		contig_weights[bin_name] = fraction_list
+		contig_weights[cluster] = fraction_list
 
 	for cluster in cluster_details:
 		( gc_av, gc_stdev ) = weighted_av_and_stdev(gc_percents[cluster], contig_weights[cluster])
