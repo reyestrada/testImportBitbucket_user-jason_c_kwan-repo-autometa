@@ -26,6 +26,15 @@ import pandas as pd
 from Bio import SeqIO
 import subprocess
 import math
+import numpy as np
+
+# See https://stackoverflow.com/questions/2413522/weighted-standard-deviation-in-numpy
+def weighted_av_and_stdev(values, weights):
+	value_array = np.asarray(values)
+	weight_array = np.asarray(weights)
+	average = np.average(value_array, weights=weight_array)
+	variance = np.average((value_array - average)**2, weights=weight_array)
+	return(average, math.sqrt(variance))
 
 def run_command(command_string, stdout_path = None):
 	# Function that checks if a command ran properly. If it didn't, then print an error message then quit
@@ -162,7 +171,7 @@ for seq_record in SeqIO.parse(fasta_path, 'fasta'):
 # Output summary table plus individual fasta files
 summary_table_path = output_dir + '/cluster_summary_table'
 summary_table = open(summary_table_path, 'w')
-summary_table.write('cluster\tsize\tlongest_contig\tn50\tnumber_contigs\tcompleteness\tpurity\tav_cov\tav_gc\n')
+summary_table.write('cluster\tsize\tlongest_contig\tn50\tnumber_contigs\tcompleteness\tpurity\tav_cov\tcov_sdpc\tav_gc\tgc_sdpc\n')
 
 for cluster in cluster_sequences:
 	attributes = assess_assembly(cluster_sequences[cluster])
@@ -192,19 +201,24 @@ for cluster in cluster_sequences:
 		purity = (number_unique_markers / number_markers_found) * 100
 
 	# Calculate average GC and cov, weighted by sequence length
-	weighted_gc_av = 0.0
-	weighted_cov_av = 0.0
+	seq_weights = list() 
+	seq_covs = list()
+	seq_gc = list()
 	for seq_record in cluster_sequences[cluster]:
 		seq_name = str(seq_record.id)
 		seq_length = contig_info[seq_name]['length']
-		seq_gc = contig_info[seq_name]['gc']
-		seq_cov = contig_info[seq_name]['cov']
-		seq_length_frac = seq_length / total_size
-		weighted_gc_av += seq_gc * seq_length_frac
-		weighted_cov_av += seq_cov * seq_length_frac
+		seq_gc.append(contig_info[seq_name]['gc'])
+		seq_covs.append(contig_info[seq_name]['cov'])
+		seq_weights.append(seq_length / total_size)
+
+	(weighted_gc_av, weighted_gc_stdev) = weighted_av_and_stdev(seq_gc, seq_weights)
+	(weighted_cov_av, weighted_cov_stdev) = weighted_av_and_stdev(seq_covs, seq_weights)
+
+	weighted_gc_sdpc = (weighted_gc_stdev / weighted_gc_av)*100
+	weighted_cov_sdpc = (weighted_cov_stdev / weighted_cov_av)*100
 
 	# Write line in summary table
-	output_string = '\t'.join([cluster, str(total_size), str(longest_contig), str(n50), str(number_contigs), str(completeness), str(purity), str(weighted_cov_av), str(weighted_gc_av)])
+	output_string = '\t'.join([cluster, str(total_size), str(longest_contig), str(n50), str(number_contigs), str(completeness), str(purity), str(weighted_cov_av), str(weighted_cov_sdpc), str(weighted_gc_av), str(weighted_gc_sdpc)])
 	summary_table.write(output_string + '\n')
 
 	# Write individual fasta file
