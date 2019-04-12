@@ -228,7 +228,7 @@ for bin_name in bfs_sets:
 	filepath = os.path.join(output_dir, bin_name + '.connections.tab')
 	filehandles[bin_name] = open(filepath, 'w')
 #pdb.set_trace()
-with open(graph_input_path) as graph_input:
+with open(graph_file_path) as graph_input:
 	for i,line in enumerate(graph_input):
 		if i == 0:
 			for bin_name in filehandles:
