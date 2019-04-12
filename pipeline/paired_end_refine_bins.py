@@ -65,10 +65,10 @@ def bfs(graph,start,bin_designation):
 						continue
 					elif bin_designation in bin_stats:
 						# Work out z score
-						if bin_stats[bin_designation]['stdev'] == 0:
+						if bin_stats[bin_designation]['connections_stdev'] == 0:
 							continue
 						else:
-							z_score = (graph[node][neighbor] - bin_stats[bin_designation]['mean']) / bin_stats[bin_designation]['stdev']
+							z_score = (graph[node][neighbor] - bin_stats[bin_designation]['connections_mean']) / bin_stats[bin_designation]['connections_stdev']
 							if z_score <= 3:
 								neighbors.append(neighbor)
 			else:
