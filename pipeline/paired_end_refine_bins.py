@@ -25,7 +25,7 @@ import math
 import argparse
 import os
 import pandas as pd
-
+import pdb
 # See https://stackoverflow.com/questions/2413522/weighted-standard-deviation-in-numpy
 def weighted_av_and_stdev(values, weights):
 	value_array = np.asarray(values)
@@ -79,6 +79,37 @@ def bfs(graph,start,bin_designation):
 				queue.append(neighbor)
 
 	return set(explored)
+
+def shouldCombine(bin_list):
+	# Works out if the combined bin would be >95% pure
+	combined_contig_set = set()
+	for bin_name in bin_list:
+		if bin_name != 'unclustered':
+			combined_contig_set = combined_contig_set.union(bfs_sets[bin_name])
+	pfam_counts = dict()
+	for i,row in master_table.iterrows():
+		contig = row['contig']
+		if contig in combined_contig_set:
+			pfam_list = row['single_copy_PFAMs'].split(',')
+			for pfam in pfam_list:
+				if pfam in pfam_counts:
+					pfam_counts[pfam] += 1
+				else:
+					pfam_counts[pfam] = 1
+	number_unique_markers = 0
+	for pfam in pfam_counts:
+		if pfam_counts[pfam] == 1:
+			number_unique_markers += 1
+	number_markers_found = len(pfam_counts.keys())
+	if number_markers_found == 0:
+		purity = 100
+	else:
+		purity = (number_unique_markers / number_markers_found) * 100
+	if purity > 95.0:
+		print(' '.join(bin_list) + ' should be merged')
+		return True
+	else:
+		return False
 
 parser = argparse.ArgumentParser(description='Script to refine bins made by run_autometa.py or ML_recruitment.py using information from paired-end read alignment')
 parser.add_argument('-b', '--bin_table', metavar='<bin.tab>', help='path to the output from either run_autometa.py or ML_recruitment.py', required=True)
@@ -204,6 +235,58 @@ for bin_name in bin_sets:
 	contig_list = list(bin_sets[bin_name])
 	bfs_sets[bin_name] = bfs(connection_graph, contig_list, bin_name)
 
+# We now refine the sets
+# First step is to decide which sets should be merged, based on the completeness/purity of the merged
+# bin
+
+# Measure how heterogenous each bfs_set is
+bfs_homogeneity = dict() # Keyed by bin, holds dictionaries of contig bin counts
+for bin_name in bfs_sets:
+	bin_dict = dict()
+	for contig in bfs_sets[bin_name]:
+		contig_bin = bin_lookup[contig[:-1]]
+		if contig_bin in bin_dict:
+			bin_dict[contig_bin] += 1
+		else:
+			bin_dict[contig_bin] = 1
+	bfs_homogeneity[bin_name] = bin_dict
+
+heterogenous_bins = set()
+for bin_name in bfs_homogeneity:
+	if bin_name == 'unclustered':
+		continue
+	self_assigned = 0
+	total_contigs = len(bfs_sets[bin_name])
+	for assigned_bin in bfs_homogeneity[bin_name]:
+		if assigned_bin == bin_name or assigned_bin == 'unclustered':
+			self_assigned += bfs_homogeneity[bin_name][assigned_bin]
+	if self_assigned / total_contigs < 0.9:
+		heterogenous_bins.add(bin_name)
+
+# Now for each heterogenous bin, work out what the purity would be if they were combined
+# If the purity of the combined bin is >95%, then merge the bins
+for bin_name in heterogenous_bins:
+	bins_to_combine = bfs_homogeneity[bin_name].keys()
+	# Check which bins still exist
+	bins_to_combine_filtered = list()
+	for member_bin in bins_to_combine:
+		if member_bin in bfs_sets:
+			bins_to_combine_filtered.append(member_bin)
+
+	if shouldCombine(bins_to_combine_filtered):
+		# All other bins in bins_to_combine apart from unclustered will be subsumed into bin_name
+		new_contig_set = set()
+		for member_bin in bins_to_combine_filtered:
+			if member_bin != 'unclustered':
+				new_contig_set = new_contig_set.union(bfs_sets[member_bin])
+				del bfs_sets[member_bin]
+		bfs_sets[bin_name] = new_contig_set
+
+# Second step is to disentangle sets so that there are no overlaps
+
+
+
+pdb.set_trace()
 # Measure how heterogenous each bfs_set is
 for bin_name in bfs_sets:
 	bin_dict = dict()
