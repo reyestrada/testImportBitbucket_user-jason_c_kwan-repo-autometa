@@ -153,7 +153,7 @@ for bin_name in bin_lengths:
 
 # Now make graph data structure
 connection_graph = dict() # Dictionary of dictionaries (stores number of read connections)
-with open(graph_input_path) as graph_input:
+with open(graph_file_path) as graph_input:
 	for i,line in enumerate(graph_input):
 		if i > 0:
 			line_list = line.rstrip().split('\t')
