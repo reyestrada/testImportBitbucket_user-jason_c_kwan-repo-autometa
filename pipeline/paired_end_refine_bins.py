@@ -25,6 +25,11 @@ import math
 import argparse
 import os
 import pandas as pd
+from itertools import combinations
+import operator
+from scipy import stats
+import csv
+import numbers
 import pdb
 # See https://stackoverflow.com/questions/2413522/weighted-standard-deviation-in-numpy
 def weighted_av_and_stdev(values, weights):
@@ -61,7 +66,7 @@ def bfs(graph,start,bin_designation):
 					elif node[:-1] == neighbor[:-1]:
 						# We keep any connection between s and e of the same contig
 						neighbors.append(neighbor)
-					elif neighbor in repeat_contigs:
+					elif node in repeat_contigs:
 						continue
 					elif bin_designation in bin_stats:
 						# Work out z score
@@ -80,16 +85,47 @@ def bfs(graph,start,bin_designation):
 
 	return set(explored)
 
-def shouldCombine(bin_list):
-	# Works out if the combined bin would be >95% pure
-	combined_contig_set = set()
-	for bin_name in bin_list:
-		if bin_name != 'unclustered':
-			combined_contig_set = combined_contig_set.union(bfs_sets[bin_name])
+def shouldMerge(donor_bin, host_bin):
+	# First we make arrays of coverages and gc for each bin, for t-test
+	donor_bin_coverages = list()
+	donor_bin_bhtsne_x = list()
+	donor_bin_bhtsne_y = list()
+	host_bin_coverages = list()
+	host_bin_bhtsne_x = list()
+	host_bin_bhtsne_y = list()
+
+	for i,row in master_table.iterrows():
+		contig = row['contig']
+		cov = row['cov']
+		bh_tsne_x = row['bh_tsne_x']
+		bh_tsne_y = row['bh_tsne_y']
+
+		if contig in bfs_sets_simple[donor_bin]:
+			donor_bin_coverages.append(cov)
+			donor_bin_bhtsne_x.append(bh_tsne_x)
+			donor_bin_bhtsne_y.append(bh_tsne_y)
+
+		if contig in bfs_sets_simple[host_bin]:
+			host_bin_coverages.append(cov)
+			host_bin_bhtsne_x.append(bh_tsne_x)
+			host_bin_bhtsne_y.append(bh_tsne_y)
+
+	( cov_t_statistic, cov_p_value ) = stats.ttest_ind(donor_bin_coverages, host_bin_coverages, equal_var=False)
+	( bhtsne_x_statistic, bhtsne_x_p_value ) = stats.ttest_ind(donor_bin_bhtsne_x, host_bin_bhtsne_x, equal_var=False)
+	( bhtsne_y_statistic, bhtsne_y_p_value ) = stats.ttest_ind(donor_bin_bhtsne_y, host_bin_bhtsne_y, equal_var=False)
+
+	if cov_p_value < 0.05 or bhtsne_x_p_value < 0.05 or bhtsne_y_p_value < 0.05:
+		return False
+
+	# Now we check whether merging would give a bin >95% pure
+	combined_contig_set = bfs_sets_simple[donor_bin].union(bfs_sets_simple[host_bin])
+
 	pfam_counts = dict()
 	for i,row in master_table.iterrows():
 		contig = row['contig']
-		if contig in combined_contig_set:
+		if contig + 's' in combined_contig_set or contig + 'e' in combined_contig_set:
+			if row['single_copy_PFAMs'] == 'NA' or (isinstance(row['single_copy_PFAMs'], numbers.Number) and math.isnan(row['single_copy_PFAMs'])):
+				continue
 			pfam_list = row['single_copy_PFAMs'].split(',')
 			for pfam in pfam_list:
 				if pfam in pfam_counts:
@@ -106,10 +142,10 @@ def shouldCombine(bin_list):
 	else:
 		purity = (number_unique_markers / number_markers_found) * 100
 	if purity > 95.0:
-		print(' '.join(bin_list) + ' should be merged')
 		return True
 	else:
 		return False
+
 
 parser = argparse.ArgumentParser(description='Script to refine bins made by run_autometa.py or ML_recruitment.py using information from paired-end read alignment')
 parser.add_argument('-b', '--bin_table', metavar='<bin.tab>', help='path to the output from either run_autometa.py or ML_recruitment.py', required=True)
@@ -140,7 +176,7 @@ if not os.path.isdir(output_dir):
 master_table = pd.read_table(bin_table_path)
 
 # Format check for the table
-columns_to_check = [cluster_column_heading, 'contig', 'length', 'cov', 'gc', 'single_copy_PFAMs']
+columns_to_check = [cluster_column_heading, 'contig', 'length', 'cov', 'gc', 'bh_tsne_x', 'bh_tsne_y', 'single_copy_PFAMs']
 
 for column in columns_to_check:
 	if column not in master_table.columns:
@@ -235,94 +271,128 @@ for bin_name in bin_sets:
 	contig_list = list(bin_sets[bin_name])
 	bfs_sets[bin_name] = bfs(connection_graph, contig_list, bin_name)
 
-# We now refine the sets
-# First step is to decide which sets should be merged, based on the completeness/purity of the merged
-# bin
+# Make a new dataset with simple contig names (i.e. without 's' and 'e' on the end)
+bfs_sets_simple = dict()
 
-# Measure how heterogenous each bfs_set is
-bfs_homogeneity = dict() # Keyed by bin, holds dictionaries of contig bin counts
 for bin_name in bfs_sets:
-	bin_dict = dict()
-	for contig in bfs_sets[bin_name]:
-		contig_bin = bin_lookup[contig[:-1]]
-		if contig_bin in bin_dict:
-			bin_dict[contig_bin] += 1
-		else:
-			bin_dict[contig_bin] = 1
-	bfs_homogeneity[bin_name] = bin_dict
-
-heterogenous_bins = set()
-for bin_name in bfs_homogeneity:
-	if bin_name == 'unclustered':
+	if bin_name == 'unclustered': # We assume all other bins have better claim to contigs in unclustered where there is overlap
 		continue
-	self_assigned = 0
-	total_contigs = len(bfs_sets[bin_name])
-	for assigned_bin in bfs_homogeneity[bin_name]:
-		if assigned_bin == bin_name or assigned_bin == 'unclustered':
-			self_assigned += bfs_homogeneity[bin_name][assigned_bin]
-	if self_assigned / total_contigs < 0.9:
-		heterogenous_bins.add(bin_name)
+	bfs_sets_simple[bin_name] = set()
+	for contig_name in bfs_sets[bin_name]:
+		bfs_sets_simple[bin_name].add(contig_name[:-1])
 
-# Now for each heterogenous bin, work out what the purity would be if they were combined
-# If the purity of the combined bin is >95%, then merge the bins
-for bin_name in heterogenous_bins:
-	bins_to_combine = bfs_homogeneity[bin_name].keys()
-	# Check which bins still exist
-	bins_to_combine_filtered = list()
-	for member_bin in bins_to_combine:
-		if member_bin in bfs_sets:
-			bins_to_combine_filtered.append(member_bin)
-
-	if shouldCombine(bins_to_combine_filtered):
-		# All other bins in bins_to_combine apart from unclustered will be subsumed into bin_name
-		new_contig_set = set()
-		for member_bin in bins_to_combine_filtered:
-			if member_bin != 'unclustered':
-				new_contig_set = new_contig_set.union(bfs_sets[member_bin])
-				del bfs_sets[member_bin]
-		bfs_sets[bin_name] = new_contig_set
-
-# Second step is to disentangle sets so that there are no overlaps
-
-
-
-pdb.set_trace()
-# Measure how heterogenous each bfs_set is
-for bin_name in bfs_sets:
-	bin_dict = dict()
-	for contig in bfs_sets[bin_name]:
-		contig_bin = bin_lookup[contig[:-1]]
-		if contig_bin in bin_dict:
-			bin_dict[contig_bin] += 1
+# Now we merge bins, if there is >10% of contigs overlapping, and the coverage, bh_tsne_x and bh_tsne_y is not significantly
+# different (t-test), and only if the combination is >95% pure.
+notFinished = True
+while(notFinished):
+	ordered_bin_list = bfs_sets_simple.keys()
+	overlap = dict() # Dictionary of dictionaries. Keyed by bin, holds dictionary of the number of contigs shared with other bins
+	for combination_tuple in combinations(ordered_bin_list, 2):
+		number_shared_contigs = len(bfs_sets_simple[combination_tuple[0]].intersection(bfs_sets_simple[combination_tuple[1]]))
+		if number_shared_contigs == 0:
+			continue
+		if combination_tuple[0] in overlap:
+			overlap[combination_tuple[0]][combination_tuple[1]] = number_shared_contigs
 		else:
-			bin_dict[contig_bin] = 1
-	output_string_list = list()
-	for contig_bin in bin_dict:
-		percent = (bin_dict[contig_bin] / len(bfs_sets[bin_name])) * 100
-		output_string = str(percent) + '% ' + contig_bin
-		output_string_list.append(output_string)
+			overlap[combination_tuple[0]] = { combination_tuple[1]: number_shared_contigs }
 
-	output_string = bin_name + ' BFS set: ' + ','.join(output_string_list)
-	print(output_string)
+		if combination_tuple[1] in overlap:
+			overlap[combination_tuple[1]][combination_tuple[0]] = number_shared_contigs
+		else:
+			overlap[combination_tuple[1]] = { combination_tuple[0]: number_shared_contigs }
 
-# Now for each bin, write a subset of the connection graph
-filehandles = dict() # binned by bin name
-for bin_name in bfs_sets:
-	filepath = os.path.join(output_dir, bin_name + '.connections.tab')
-	filehandles[bin_name] = open(filepath, 'w')
-#pdb.set_trace()
+	overlap_percents = dict()
+	for source_bin in overlap:
+		total_contigs = len(bfs_sets_simple[source_bin])
+		overlap_percents[source_bin] = {}
+		for target_bin in overlap[source_bin]:
+			percent = (overlap[source_bin][target_bin] / total_contigs) * 100
+			overlap_percents[source_bin][target_bin] = percent
+
+	# Order the bins in descending order of highest overlap, to go through and see which ones should be 
+	# merged
+	biggest_overlaps = dict()
+	biggest_overlap_target_bins = dict()
+	for bin_name in overlap:
+		largest_local_overlap = 0
+		largest_target_bin = None
+		for target_bin in overlap_percents[bin_name]:
+			if overlap_percents[bin_name][target_bin] > largest_local_overlap:
+				largest_local_overlap = overlap_percents[bin_name][target_bin]
+				largest_target_bin = target_bin
+		biggest_overlaps[bin_name] = largest_local_overlap
+		biggest_overlap_target_bins[bin_name] = largest_target_bin
+
+	sorted_bin_tuples = sorted(biggest_overlaps.items(), key=operator.itemgetter(1), reverse=True)
+
+	# Go through sorted_bin_tuples, testing whether the overlapping pairs should be merged
+	# If so, we stop and continue the while loop after merging
+	merged = 0
+	for bin_tuple in sorted_bin_tuples:
+		source_bin = bin_tuple[0]
+		target_bin = biggest_overlap_target_bins[source_bin]
+		if bin_tuple[1] > 10 and shouldMerge(source_bin, target_bin):
+			print('Merging ' + source_bin + ' into ' + target_bin)
+			bfs_sets_simple[target_bin] = bfs_sets_simple[target_bin].union(bfs_sets_simple[source_bin])
+			del bfs_sets_simple[source_bin]
+			merged += 1
+			break
+
+	if merged == 0:
+		notFinished = False
+
+# Now we identify contigs that are shared between more than one bfs set, and delete them from the sets
+contigs_to_delete = set()
+ordered_bin_list = bfs_sets_simple.keys()
+for combination_tuple in combinations(ordered_bin_list, 2):
+	shared_contigs = bfs_sets_simple[combination_tuple[0]].intersection(bfs_sets_simple[combination_tuple[1]])
+	for contig in shared_contigs:
+		contigs_to_delete.add(contig)
+
+for contig in contigs_to_delete:
+	for bin_name in bfs_sets_simple:
+		if contig in bfs_sets_simple[bin_name]:
+			bfs_sets_simple[bin_name].remove(contig)
+
+# Make lookup data structure
+paired_end_refined_bins = dict() # Keyed by contig
+for bin_name in bfs_sets_simple:
+	for contig in bfs_sets_simple[bin_name]:
+		paired_end_refined_bins[contig] = bin_name
+
+# Now we write a new column to the master table
+new_column = list()
+for i,row in master_table.iterrows():
+	contig = row['contig']
+	if contig in paired_end_refined_bins:
+		new_column.append(paired_end_refined_bins[contig])
+	else:
+		new_column.append('unclustered')
+
+master_table['paired_end_refined_bin'] = pd.Series(new_column, index = master_table.index)
+
+output_table_path = os.path.join(output_dir, 'paired_end_refine_bins_output.tab')
+
+master_table.to_csv(path_or_buf=output_table_path, sep='\t', index=False, quoting=csv.QUOTE_NONE)
+
+# Now output subset graphs using the new bins
+filehandles = dict()
+for bin_name in bfs_sets_simple:
+	file_path = os.path.join(output_dir, bin_name + '.connections.tab')
+	filehandles[bin_name] = open(file_path, 'w')
+
 with open(graph_file_path) as graph_input:
-	for i,line in enumerate(graph_input):
+	for line in graph_input:
 		if i == 0:
 			for bin_name in filehandles:
 				filehandles[bin_name].write(line)
 		else:
 			line_list = line.rstrip().split('\t')
-			contig1 = line_list[0]
-			contig2 = line_list[2]
-
-			for bin_name in bfs_sets:
-				if (contig1 in bfs_sets[bin_name]) or (contig2 in bfs_sets[bin_name]):
+			contig1 = line_list[0][:-1]
+			contig2 = line_list[2][:-1]
+			if contig1 in paired_end_refined_bins and contig2 in paired_end_refined_bins:
+				if paired_end_refined_bins[contig1] == paired_end_refined_bins[contig2]:
+					bin_name = paired_end_refined_bins[contig1]
 					filehandles[bin_name].write(line)
 
 for bin_name in filehandles:
