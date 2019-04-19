@@ -189,6 +189,7 @@ bin_lookup = dict() # Dictionary of contigs, holds bin
 bin_lengths = dict() # Dictionary keyed by bin, holds lists of contig lengths
 bin_gc = dict() # Dictionary keyed by bin, holds lists of contig gc percents
 bin_cov = dict() # Dictionary keyed by bin, holds lists of contig coverages
+contig_lengths = dict()
 for i,row in master_table.iterrows():
 	contig = row['contig']
 	bin_name = row[cluster_column_heading]
@@ -196,6 +197,7 @@ for i,row in master_table.iterrows():
 	length = row['length']
 	gc = row['gc']
 	cov = row['cov']
+	contig_lengths[contig] = length
 	if bin_name in bin_sets:
 		bin_sets[bin_name].add(contig)
 		bin_lengths[bin_name].append(length)
@@ -303,10 +305,15 @@ while(notFinished):
 
 	overlap_percents = dict()
 	for source_bin in overlap:
-		total_contigs = len(bfs_sets_simple[source_bin])
+		source_bin_length = 0
+		for contig in bfs_sets_simple[source_bin]:
+			source_bin_length += contig_lengths[contig]
 		overlap_percents[source_bin] = {}
 		for target_bin in overlap[source_bin]:
-			percent = (overlap[source_bin][target_bin] / total_contigs) * 100
+			target_overlap_length = 0
+			for contig in bfs_sets_simple[source_bin].intersection(bfs_sets_simple[target_bin]):
+				target_overlap_length += contig_lengths[contig]
+			percent = (target_overlap_length / source_bin_length) * 100
 			overlap_percents[source_bin][target_bin] = percent
 
 	# Order the bins in descending order of highest overlap, to go through and see which ones should be 
