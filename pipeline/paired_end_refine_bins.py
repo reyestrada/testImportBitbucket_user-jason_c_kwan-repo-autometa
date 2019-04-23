@@ -74,8 +74,12 @@ def bfs(graph,start,bin_designation):
 							continue
 						else:
 							z_score = (graph[node][neighbor] - bin_stats[bin_designation]['connections_mean']) / bin_stats[bin_designation]['connections_stdev']
-							if z_score <= 3:
-								neighbors.append(neighbor)
+							if z_score < 3 and z_score > -3:
+								# Also check if coverage is not under the lower limit of z-score 
+								# (we allow potential repeats, but not lower outliers)
+								cov_z_score = (contig_coverages[neighbor] - bin_stats[bin_designation]['weighted_av_cov']) / ((bin_stats[bin_designation]['av_sdpc']/100) * bin_stats[bin_designation]['weighted_av_cov'])
+								if cov_z_score > -3:
+									neighbors.append(neighbor)
 			else:
 				neighbors = []
 
@@ -190,6 +194,7 @@ bin_lengths = dict() # Dictionary keyed by bin, holds lists of contig lengths
 bin_gc = dict() # Dictionary keyed by bin, holds lists of contig gc percents
 bin_cov = dict() # Dictionary keyed by bin, holds lists of contig coverages
 contig_lengths = dict()
+contig_coverages = dict()
 for i,row in master_table.iterrows():
 	contig = row['contig']
 	bin_name = row[cluster_column_heading]
@@ -198,6 +203,7 @@ for i,row in master_table.iterrows():
 	gc = row['gc']
 	cov = row['cov']
 	contig_lengths[contig] = length
+	contig_coverages[contig] = cov
 	if bin_name in bin_sets:
 		bin_sets[bin_name].add(contig)
 		bin_lengths[bin_name].append(length)
