@@ -77,7 +77,7 @@ def bfs(graph,start,bin_designation):
 							if z_score < 3 and z_score > -3:
 								# Also check if coverage is not under the lower limit of z-score 
 								# (we allow potential repeats, but not lower outliers)
-								cov_z_score = (contig_coverages[neighbor] - bin_stats[bin_designation]['weighted_av_cov']) / ((bin_stats[bin_designation]['av_sdpc']/100) * bin_stats[bin_designation]['weighted_av_cov'])
+								cov_z_score = (contig_coverages[neighbor[:-1]] - bin_stats[bin_designation]['weighted_av_cov']) / ((bin_stats[bin_designation]['cov_sdpc']/100) * bin_stats[bin_designation]['weighted_av_cov'])
 								if cov_z_score > -3:
 									neighbors.append(neighbor)
 			else:
