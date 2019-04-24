@@ -79,7 +79,14 @@ def bfs(graph,start,bin_designation):
 								# (we allow potential repeats, but not lower outliers)
 								cov_z_score = (contig_coverages[neighbor[:-1]] - bin_stats[bin_designation]['weighted_av_cov']) / ((bin_stats[bin_designation]['cov_sdpc']/100) * bin_stats[bin_designation]['weighted_av_cov'])
 								if cov_z_score > -3:
-									neighbors.append(neighbor)
+									# Now we check whether the coverage of the contig is commensurate to the number of connections it has 
+									# This is to avoid weirdly high coverage contigs being included in a bin when they just have one connection
+									highest_number_of_connections = 0
+									for contig in [ neighbor[:-1] + 's', neighbor[:-1] + 'e' ]:
+										if len(graph[contig]) > highest_number_of_connections:
+											highest_number_of_connections = len(graph[contig])
+									if contig_coverages[neighbor[:-1]] / bin_stats[bin_designation]['weighted_av_cov'] < (2 * highest_number_of_connections):
+										neighbors.append(neighbor)
 			else:
 				neighbors = []
 
