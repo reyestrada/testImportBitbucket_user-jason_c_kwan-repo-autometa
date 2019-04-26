@@ -61,7 +61,7 @@ def bfs(graph,start,bin_designation):
 			if node in graph:
 				neighbors = []
 				for neighbor in graph[node]:
-					if neighbor in bin_sets[bin_designation]:
+					if neighbor[:-1] in bin_sets[bin_designation]:
 						neighbors.append(neighbor)
 					elif node[:-1] == neighbor[:-1]:
 						# We keep any connection between s and e of the same contig
@@ -84,7 +84,9 @@ def bfs(graph,start,bin_designation):
 									highest_number_of_connections = 0
 									for contig in [ neighbor[:-1] + 's', neighbor[:-1] + 'e' ]:
 										if len(graph[contig]) > highest_number_of_connections:
-											highest_number_of_connections = len(graph[contig])
+											for connecting_contig in graph[contig]:
+												if connecting_contig[:-1] in bin_sets[bin_designation]:
+													highest_number_of_connections += 1
 									if contig_coverages[neighbor[:-1]] / bin_stats[bin_designation]['weighted_av_cov'] < (2 * highest_number_of_connections):
 										neighbors.append(neighbor)
 			else:
