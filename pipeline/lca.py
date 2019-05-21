@@ -257,7 +257,7 @@ print('{}: Finished extracting blastp orfs. parsing prot.acc2taxid DB'.format(t)
 accession2taxid_dict = lca_functions.Process_accession2taxid_file(accession2taxid_file, blast_orfs)
 
 t = time.strftime('%H:%M:%S', time.gmtime(round((time.time()-t0),2)))
-print('{}: Finished acc2taxid tranlsation dict'.format(t))
+print('{}: Finished acc2taxid translation dict'.format(t))
 
 blast_taxids = lca_functions.Convert_accession2taxid(accession2taxid_dict, blast_orfs)
 
