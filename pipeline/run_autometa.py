@@ -138,6 +138,8 @@ def length_trim(fasta, length_cutoff, outfpath=None):
 def make_cov_table(asm_fpath, reads_fpath, dirpath, proc=1):
 	asm_base, _ = os.path.splitext(os.path.basename(asm_fpath))
 	cov_table_fpath = '{0}/{1}.coverage.tab'.format(dirpath,asm_base)
+	if os.path.isfile(cov_tab_fpath):
+		return cov_tab_fpath
 	cmd = ' '.join(map(str,['{}/calculate_read_coverage.py'.format(pipeline_path),
 					'-a',asm_fpath,
 					'-i',reads_fpath,

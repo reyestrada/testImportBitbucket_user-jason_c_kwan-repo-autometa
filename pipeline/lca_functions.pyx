@@ -21,7 +21,6 @@
 # __Author__: Evan R. Rees
 
 
-import re
 import numpy as np
 from subprocess import check_output
 from itertools import chain
