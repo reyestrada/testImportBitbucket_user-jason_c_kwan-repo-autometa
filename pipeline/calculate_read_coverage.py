@@ -135,8 +135,7 @@ def main():
     run_command(cmd, genome_bed_fpath)
 
     #Build final table
-    asm_base, _ = os.path.splitext(assembly_bname)
-    outfile = '{0}/{1}.coverage.tab'.format(outdir, asm_base)
+    outfile = '{0}/{1}.coverage.tab'.format(outdir, assembly_bname)
     cmd = ' '.join(['contig_coverage_from_bedtools.pl',genome_bed_fpath])
     run_command(cmd, outfile)
 
