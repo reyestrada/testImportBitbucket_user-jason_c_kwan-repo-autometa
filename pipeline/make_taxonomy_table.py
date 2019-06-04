@@ -209,7 +209,7 @@ def run_prodigal(asm_fpath):
 # def run_dmnd_subsets(fasta_fp, ):
 # 	pass
 
-def run_diamond(orfs_infpath, dmnd_db_fpath, processors, daa_outfpath):
+def run_diamond(orfs_infpath, dmnd_db_fpath, processors):
 	dmnd_outfpath = orfs_infpath + '.tab'
 	tmp_dirpath = os.path.dirname(orfs_infpath) + '/tmp'
 	if not os.path.isdir(tmp_dirpath):
@@ -222,7 +222,8 @@ def run_diamond(orfs_infpath, dmnd_db_fpath, processors, daa_outfpath):
 							'--evalue','1e-5',
 							'--max-target-seqs','200',
 							'-p',processors,
-							'--daa',daa_outfpath,
+							'--outfmt','6',
+							'--out',dmnd_outfpath,
 							'-t',tmp_dirpath]))
 
 	error = run_command_return(cmd)
@@ -237,11 +238,6 @@ def run_diamond(orfs_infpath, dmnd_db_fpath, processors, daa_outfpath):
 		# update_dbs(db_dir_path, 'nr')
 		# run_command(cmd)
 		exit(1)
-
-	cmd = ' '.join(['diamond','view',
-					'-a',daa_outfpath,
-					'-f','tab',
-					'-o',dmnd_outfpath])
 
 	run_command(cmd)
 	return dmnd_outfpath
@@ -404,23 +400,14 @@ if not os.path.isfile(prodigal_outfpath):
 	#Check for file and if it doesn't exist run make_marker_table
 	run_prodigal(filtered_asm_fpath)
 
-dmd_daa_err = "{0} not found. The diamond alignment archive ({1}) may be invalid.\n\
-Please remove or provide a different DAA file or manually construct {0} with\
-\ncmd:\n\tdiamond view -a {2} -f tab -o {0}\nExiting..."\
-.format(dmnd_tab_fpath,
-		dmnd_daa_fpath,
-		os.path.basename(dmnd_daa_fpath))
-
-if not os.path.isfile(dmnd_daa_fpath):
-	print "Could not find {}. Running diamond blast... ".format(dmnd_daa_fpath)
-	diamond_output = run_diamond(orfs_basepath, diamond_db_path, num_processors, dmnd_daa_fpath)
-elif os.stat(dmnd_daa_fpath).st_size == 0:
-	print "{} file is empty. Re-running diamond blast...".format(dmnd_daa_fpath)
-	diamond_output = run_diamond(orfs_basepath, diamond_db_path, num_processors, dmnd_daa_fpath)
-elif not os.path.isfile(dmnd_tab_fpath):
-	print(dmd_daa_err)
-	exit(1)
+if not os.path.isfile(dmnd_tab_fpath):
+	print "{} not found. Running diamond blast... ".format(dmnd_tab_fpath)
+	diamond_output = run_diamond(orfs_basepath, diamond_db_path, num_processors)
+elif os.stat(dmnd_tab_fpath).st_size == 0:
+	print "{} file is empty. Re-running diamond blast...".format(dmnd_tab_fpath)
+	diamond_output = run_diamond(orfs_basepath, diamond_db_path, num_processors)
 else:
+	print("{} exists. Continuing to LCA".format(dmnd_tab_fpath))
 	diamond_output = dmnd_tab_fpath
 
 if not os.path.isfile(lca_fpath):
