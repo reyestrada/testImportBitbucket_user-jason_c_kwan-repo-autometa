@@ -207,7 +207,7 @@ def run_prodigal(asm_fpath):
 	run_command(cmd)
 	return(orf_outfpath)
 
-def dmnd_split_reduce(fasta_fpath, outdir, dmnd_cmd, n_files=4, n_tries=3):
+def dmnd_split_reduce(orfs_fpath, outdir, dmnd_cmd, n_files=4, n_tries=3):
 	# 1. Split orfs fasta to perform diamond on subsets
 	errors = [float('inf')]
 	n_try = 1
@@ -220,7 +220,7 @@ def dmnd_split_reduce(fasta_fpath, outdir, dmnd_cmd, n_files=4, n_tries=3):
 		n_files *= n_try
 		split_cmd = ' '.join(map(str,[
 			'split_fasta.py',
-			'--fasta {}'.format(fasta_fpath),
+			'--fasta {}'.format(orfs_fpath),
 			'--num_files {}'.format(n_files),
 			'--output_dir {}'.format(outdir),
 		]))
@@ -251,7 +251,7 @@ def dmnd_split_reduce(fasta_fpath, outdir, dmnd_cmd, n_files=4, n_tries=3):
 		print('split reduce parameter:\nn_files={}'.format(n_files))
 		exit(1)
 
-	reduced_dmnd_tab = fasta_fpath.replace('.faa','.tab')
+	reduced_dmnd_tab = orfs_fpath.replace('.faa','.tab')
 	outfile = open(reduced_dmnd_tab, 'w')
 	for dmnd_fp in dmnd_fpaths:
 		fh = open(dmnd_fp)
@@ -271,7 +271,7 @@ def run_diamond(orfs_infpath, dmnd_db_fpath, processors):
 
 	cmd = ' '.join(map(str,[
 		'diamond blastp',
-		'--query {}.faa'.format(orfs_fasta),
+		'--query {}'.format(orfs_fasta),
 		'--db {}'.format(dmnd_db_fpath),
 		'--evalue 1e-5',
 		'--max-target-seqs 200',
@@ -391,7 +391,6 @@ else:
 filtered_asm_fpath = os.path.join(output_dir, fasta_fname+'.filtered'+ext)
 orfs_basepath = os.path.join(output_dir, fasta_fname+'.filtered.orfs')
 prodigal_outfpath = '{}.faa'.format(orfs_basepath)
-dmnd_daa_fpath = '{}.daa'.format(orfs_basepath)
 dmnd_tab_fpath = '{}.tab'.format(orfs_basepath)
 lca_fpath = '{}.lca'.format(orfs_basepath)
 
