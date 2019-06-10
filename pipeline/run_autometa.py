@@ -140,11 +140,13 @@ def make_cov_table(asm_fpath, reads_fpath, dirpath, proc=1):
 	cov_tab_fpath = '{0}/{1}.coverage.tab'.format(dirpath,asm_base)
 	if os.path.isfile(cov_tab_fpath):
 		return cov_tab_fpath
-	cmd = ' '.join(map(str,['{}/calculate_read_coverage.py'.format(pipeline_path),
-					'-a',asm_fpath,
-					'-i',reads_fpath,
-					'-p',proc,
-					'-o',dirpath]))
+	cmd = ' '.join(map(str,[
+		'{}/calculate_read_coverage.py'.format(pipeline_path),
+		'-a',asm_fpath,
+		'-i',reads_fpath,
+		'-p',proc,
+		'-o',dirpath,
+	]))
 	run_command(cmd)
 	return cov_tab_fpath
 
@@ -153,9 +155,11 @@ def make_contig_table(fasta, cov_tab_fpath=None):
 	outfname, _ = os.path.splitext(os.path.basename(fasta))
 	outfname += '.tab'
 	outfpath = os.path.join(output_dir, outfname)
-	cmd = ' '.join(['{}/make_contig_table.py'.format(pipeline_path),
-					'-a',fasta,
-					'-o',outfpath])
+	cmd = ' '.join([
+		'{}/make_contig_table.py'.format(pipeline_path),
+		'-a',fasta,
+		'-o',outfpath,
+	])
 	if cov_tab_fpath:
 		cmd += ' '.join(['', '-c', cov_tab_fpath])
 
@@ -171,8 +175,8 @@ def make_marker_table(fasta):
 		cutoffs = 'Archaea_single_copy_cutoffs.txt'
 
 	marker_dir = os.path.join(autometa_path, 'single-copy_markers')
-	hmm_marker_path = os.path.join(marker_dir,hmms)
-	hmm_cutoffs_path = os.path.join(marker_dir,cutoffs)
+	hmm_marker_path = os.path.join(marker_dir, hmms)
+	hmm_cutoffs_path = os.path.join(marker_dir, cutoffs)
 	#need to add processors to this script
 	outfname, _ = os.path.splitext(os.path.basename(fasta))
 	outfname += '.marker.tab'
@@ -186,23 +190,27 @@ def make_marker_table(fasta):
 		print("Making marker tab w/prodigal & hmmscan")
 		logger.info('Making {}: Running prodigal and hmmscan'.format(outfname))
 		run_command_quiet("hmmpress -f {}".format(hmm_marker_path))
-		cmd = ' '.join(map(str,['{}/make_marker_table.py'.format(pipeline_path),
-						'-a',fasta,
-						'-m',hmm_marker_path,
-						'-c',hmm_cutoffs_path,
-						'-o',outfpath,
-						'-p',processors]))
+		cmd = ' '.join(map(str,[
+			'{}/make_marker_table.py'.format(pipeline_path),
+			'-a',fasta,
+			'-m',hmm_marker_path,
+			'-c',hmm_cutoffs_path,
+			'-o',outfpath,
+			'-p',processors,
+		]))
 		run_command_quiet(cmd)
 	return outfpath
 
 def recursive_dbscan(input_table, filtered_assembly, domain):
 	recursive_dbscan_output_path = output_dir + '/recursive_dbscan_output.tab'
 	kmer_fpath = os.path.join(output_dir,'k-mer_matrix')
-	cmd = ' '.join(['{}/recursive_dbscan.py'.format(pipeline_path),
-					'-t',input_table,
-					'-a',filtered_assembly,
-					'-d',output_dir,
-					'-k',domain])
+	cmd = ' '.join([
+		'{}/recursive_dbscan.py'.format(pipeline_path),
+		'-t',input_table,
+		'-a',filtered_assembly,
+		'-d',output_dir,
+		'-k',domain,
+	])
 	run_command(cmd)
 	return recursive_dbscan_output_path, kmer_fpath
 

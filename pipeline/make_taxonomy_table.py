@@ -24,6 +24,7 @@ import os
 import pandas as pd
 from argparse import ArgumentParser
 from Bio import SeqIO
+from glob import glob
 
 def run_command(command_string, stdout_path = None):
 	# Function that checks if a command ran properly
@@ -194,8 +195,8 @@ def run_prodigal(asm_fpath):
 	orf_outfpath = os.path.join(output_dir, orfs)
 	txt_outfpath = os.path.join(output_dir, txt)
 	if os.path.isfile(orf_outfpath):
-		print "{} file already exists!".format(orf_outfpath)
-		print "Continuing to next step..."
+		print("{} file already exists!".format(orf_outfpath))
+		print("Continuing to next step...")
 		return(orf_outfpath)
 	cmd = ' '.join(['prodigal',
 					'-i',asm_fpath,
@@ -206,40 +207,93 @@ def run_prodigal(asm_fpath):
 	run_command(cmd)
 	return(orf_outfpath)
 
-# def run_dmnd_subsets(fasta_fp, ):
-# 	pass
+def dmnd_split_reduce(fasta_fpath, outdir, dmnd_cmd, n_files=4, n_tries=3):
+	# 1. Split orfs fasta to perform diamond on subsets
+	errors = [float('inf')]
+	n_try = 1
+	while n_try <= n_tries and sum(errors) > 0:
+		# remove instantiation float after first iteration
+		if float('inf') in errors:
+			errors.remove(float('inf'))
+
+		# Increase num files to decrease RAM/disks requirements after each try
+		n_files *= n_try
+		split_cmd = ' '.join(map(str,[
+			'split_fasta.py',
+			'--fasta {}'.format(fasta_fpath),
+			'--num_files {}'.format(n_files),
+			'--output_dir {}'.format(outdir),
+		]))
+		run_command(split_cmd)
+
+		# 2. Run Diamond on split fastas
+		# Filesdirpaths: outdir/splits_1,splits_2,...
+		# Filenamespaths: split.0.fasta,...,split.n-1.fasta
+		dmnd_fpaths = []
+		glob_path = '{}/*/*.split.*'.format(outdir)
+		for fpath in sorted(glob(glob_path)):
+			outfname, _ = os.path.splitext(os.path.basename(fpath))
+			outfname += '.blastp'
+			outfpath = os.path.join(outdir, outfname)
+			cmd = dmnd_cmd.split()
+			cmd[3] = fpath
+			cmd[15] = outfpath
+			cmd = ' '.join(cmd)
+			error = run_command_return(cmd)
+			errors.append(int(error))
+			dmnd_fpaths.append(outfpath)
+
+		n_try += 1
+
+	# 3. Reduce subset fastas diamond tables to one table
+	if sum(errors) > 0:
+		print('Fatal: Diamond split and reduce failed after {} tries'.format(n_tries))
+		print('split reduce parameter:\nn_files={}'.format(n_files))
+		exit(1)
+
+	reduced_dmnd_tab = fasta_fpath.replace('.faa','.tab')
+	outfile = open(reduced_dmnd_tab, 'w')
+	for dmnd_fp in dmnd_fpaths:
+		fh = open(dmnd_fp)
+		for line in fh:
+			outfile.write(line)
+		fh.close()
+	outfile.close()
+	return reduced_dmnd_tab
 
 def run_diamond(orfs_infpath, dmnd_db_fpath, processors):
 	dmnd_outfpath = orfs_infpath + '.tab'
+	orfs_fasta = orfs_infpath + '.faa'
 	tmp_dirpath = os.path.dirname(orfs_infpath) + '/tmp'
 	if not os.path.isdir(tmp_dirpath):
 		# This will give an error if the path exists but is a file instead of a dir
 		os.makedirs(tmp_dirpath)
 
-	cmd = ' '.join(map(str,['diamond','blastp',
-							'--query','{}.faa'.format(orfs_infpath),
-							'--db',dmnd_db_fpath,
-							'--evalue','1e-5',
-							'--max-target-seqs','200',
-							'-p',processors,
-							'--outfmt','6',
-							'--out',dmnd_outfpath,
-							'-t',tmp_dirpath]))
+	cmd = ' '.join(map(str,[
+		'diamond blastp',
+		'--query {}.faa'.format(orfs_fasta),
+		'--db {}'.format(dmnd_db_fpath),
+		'--evalue 1e-5',
+		'--max-target-seqs 200',
+		'-p {}'.format(processors),
+		'--outfmt 6',
+		'--out {}'.format(dmnd_outfpath),
+		'-t {}'.format(tmp_dirpath)
+	]))
 
 	error = run_command_return(cmd)
 	# If there is an error, chunk fasta or attempt to rebuild NR
 	if error == 134 or error == str(134):
-		print('Fatal: Not enough disk space for diamond alignment archive!')
-		# TODO: split_fasta and search
-		# run_dmnd_subsets(orfs_infpath)
-		exit(1)
+		print('Warning: Not enough disk space for diamond alignment!')
+		print('Attempting split and reduce method.')
+		dmnd_outfpath = dmnd_split_reduce(orfs_fasta, tmp_dirpath, cmd)
+		error = 0
 	if error:
 		# print('Error:(diamond blastp)\n{}\nRebuilding nr...'.format(error))
 		# update_dbs(db_dir_path, 'nr')
 		# run_command(cmd)
 		exit(1)
 
-	run_command(cmd)
 	return dmnd_outfpath
 
 #blast2lca using accession numbers#
