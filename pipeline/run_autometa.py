@@ -59,8 +59,8 @@ def init_logger(autom_path, db_path, out_path):
 	#Check 3rd party dependencies
 	dmnd_v = subprocess.check_output(['diamond','version']).strip()
 	logger.info('{}'.format(dmnd_v))
-	hmmscan_v = subprocess.check_output(['hmmpress','-h']).split('\n')[1].replace('# ','')
-	logger.info('{}'.format(hmmscan_v))
+	# hmmscan_v = subprocess.check_output(['hmmpress','-h']).split('\n')[1].replace('# ','')
+	# logger.info('{}'.format(hmmscan_v))
 	prodigal_v = subprocess.Popen("prodigal -v", stderr=subprocess.PIPE, shell=True).communicate()[1].replace('\n','')
 	logger.info('{}'.format(prodigal_v))
 	logger.info('DB Dir: {}'.format(db_path))
@@ -189,7 +189,7 @@ def make_marker_table(fasta):
 	else:
 		print("Making marker tab w/prodigal & hmmscan")
 		logger.info('Making {}: Running prodigal and hmmscan'.format(outfname))
-		run_command_quiet("hmmpress -f {}".format(hmm_marker_path))
+		# run_command_quiet("hmmpress -f {}".format(hmm_marker_path))
 		cmd = ' '.join(map(str,[
 			'{}/make_marker_table.py'.format(pipeline_path),
 			'-a',fasta,

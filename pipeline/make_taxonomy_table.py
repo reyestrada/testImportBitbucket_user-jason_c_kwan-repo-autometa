@@ -20,6 +20,7 @@ import sys
 import urllib2
 import subprocess
 import os
+import shutil
 
 import pandas as pd
 from argparse import ArgumentParser
@@ -207,14 +208,12 @@ def run_prodigal(asm_fpath):
 	run_command(cmd)
 	return(orf_outfpath)
 
-def dmnd_split_reduce(orfs_fpath, outdir, dmnd_cmd, n_files=4, n_tries=3):
+def dmnd_split_reduce(orfs_fpath, outdir, dmnd_cmd, n_files=2, n_tries=3):
 	# 1. Split orfs fasta to perform diamond on subsets
 	errors = [float('inf')]
 	n_try = 1
 	while n_try <= n_tries and sum(errors) > 0:
-		# remove instantiation float after first iteration
-		if float('inf') in errors:
-			errors.remove(float('inf'))
+		errors = []
 
 		# Increase num files to decrease RAM/disks requirements after each try
 		n_files *= n_try
@@ -286,7 +285,9 @@ def run_diamond(orfs_infpath, dmnd_db_fpath, processors):
 	if error == 134 or error == str(134):
 		print('Warning: Not enough disk space for diamond alignment!')
 		print('Attempting split and reduce method.')
-		dmnd_outfpath = dmnd_split_reduce(orfs_fasta, tmp_dirpath, cmd)
+		reduced_dmnd_tab = dmnd_split_reduce(orfs_fasta, tmp_dirpath, cmd)
+		shutil.move(reduced_dmnd_tab, dmnd_outfpath)
+		shutil.rmtree(tmp_dirpath)
 		error = 0
 	if error:
 		# print('Error:(diamond blastp)\n{}\nRebuilding nr...'.format(error))
