@@ -63,9 +63,14 @@ def init_logger(autom_path, db_path, out_path):
 	prodigal_v = subprocess.Popen("prodigal -v", stderr=subprocess.PIPE, shell=True).communicate()[1].replace('\n','')
 	logger.info('{}'.format(prodigal_v))
 	logger.info('DB Dir: {}'.format(db_path))
-	db_fpaths = os.listdir(db_path)
+	try:
+		db_fpaths = os.listdir(db_path)
+	except OSError as err:
+		logger.info('{} DoesNotExist/IsEmpty'.format(db_path))
+		db_fpaths = []
 	for fpath in db_fpaths:
-		logger.info('DB (fname, size): {} {}'.format(fpath, os.stat(db_path+'/'+fpath).st_size))
+		fsize = os.stat(os.path.join(db_path, fpath)).st_size
+		logger.info('DB (fname, size): {} {}'.format(fpath, fsize))
 	return logger
 
 def run_command(command_string, stdout_path = None):
@@ -287,6 +292,7 @@ if cov_table:
 	contig_table = make_contig_table(filtered_assembly, cov_table)
 else:
 	contig_table = make_contig_table(filtered_assembly)
+	
 marker_tab_path = make_marker_table(filtered_assembly)
 
 # Ensure lca functions are compiled and up-to-date

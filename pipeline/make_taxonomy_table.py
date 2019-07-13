@@ -423,7 +423,7 @@ else:
 	print('taxonomy.tab exists... Splitting original contigs into kingdoms')
 
 # Split the original contigs into sets for each kingdom
-taxonomy_pd = pd.read_table(taxonomy_table)
+taxonomy_pd = pd.read.csv(taxonomy_table, sep='\t')
 categorized_seq_objects = {}
 all_seq_records = {}
 
