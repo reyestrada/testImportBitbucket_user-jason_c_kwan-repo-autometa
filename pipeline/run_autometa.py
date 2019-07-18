@@ -167,7 +167,7 @@ def make_marker_table(fasta):
 	else:
 		print "Making the marker table with prodigal and hmmscan. This could take a while..."
 		logger.info('Making the marker table with prodigal and hmmscan. This could take a while...')
-		run_command_quiet("hmmpress -f {}".format(hmm_marker_path))
+		#run_command_quiet("hmmpress -f {}".format(hmm_marker_path))
 		run_command_quiet("{}/make_marker_table.py -a {} -m {} -c {} -o {} -p {}"\
 		.format(pipeline_path, fasta, hmm_marker_path, hmm_cutoffs_path, output_path, processors))
 	return output_path
