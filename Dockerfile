@@ -12,7 +12,7 @@ MAINTAINER Jason C. Kwan "jason.kwan@wisc.edu"
 #
 # Autometa is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the 
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU Affero General Public License for more details.
 #
 # You should have received a copy of the GNU Affero General Public License
@@ -26,6 +26,7 @@ RUN wget https://github.com/samtools/samtools/releases/download/1.6/samtools-1.6
 RUN tar -vxjf samtools-1.6.tar.bz2
 RUN cd samtools-1.6 && ./configure --prefix=/samtools && make && make install
 RUN git clone https://github.com/danielfrg/tsne.git && cd tsne && python setup.py install
-RUN git clone https://bitbucket.org/jason_c_kwan/autometa && cd autometa/pipeline && python setup_lca_functions.py build_ext --inplace
+RUN git clone https://bitbucket.org/jason_c_kwan/autometa && git checkout docker_patch && cd autometa/pipeline && python setup_lca_functions.py build_ext --inplace
 
 ENV PATH="/diamond:/autometa/pipeline:/samtools/bin:${PATH}"
+ENV PYTHON_EGG_CACHE=$(pwd)
