@@ -173,7 +173,11 @@ def getGraph(graph_file, paths_file):
 	shared_segments = set()
 	for segment_name in end_segment_names:
 		if segment_name + 's' in end_segments and segment_name + 'e' in end_segments:
-			shared_segments.add(segment_name)
+			contigs_using_segment = set()
+			for nodes in end_segments[segment_name + 's'] + end_segments[segment_name + 'e']:
+				contigs_using_segment.add(nodes[:-1])
+			if len(contigs_using_segment) > 1:
+				shared_segments.add(segment_name)
 
 	for segment in shared_segments:
 		node_list1 = end_segments[segment + 's']
@@ -387,13 +391,10 @@ for source_node in assembly_graph:
 	for bin_name in new_bfs_sets:
 		if source_node in new_bfs_sets[bin_name]:
 			for destination_node in destination_node_list:
-				if source_node not in nodes_explored and destination_node not in nodes_explored:
-					# Write to relevant file
-					if source_node[:-1] == destination_node[:-1]:
-						edge_type = 'intra'
-					else:
-						edge_type = 'inter'
-					filehandles[bin_name].write(source_node + '\t' + edge_type + '\t' + destination_node + '\t1\n')
+				if source_node[:-1] == destination_node[:-1]:
+					filehandles[bin_name].write(source_node + '\tintra\t' + destination_node + '\t1\n')
+				elif source_node not in nodes_explored or destination_node not in nodes_explored:
+					filehandles[bin_name].write(source_node + '\tinter\t' + destination_node + '\t1\n')
 					nodes_explored.add(source_node)
 					nodes_explored.add(destination_node)
 
