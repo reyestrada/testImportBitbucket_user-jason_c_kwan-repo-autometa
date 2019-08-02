@@ -25,7 +25,7 @@ import os
 import pandas as pd
 import itertools
 import gzip
-import pdb
+
 def getGraph(graph_file, paths_file):
 	# Load graph file into memory
 	S_lines = list()
@@ -103,7 +103,7 @@ def getGraph(graph_file, paths_file):
 		for line in P_lines:
 			line_list = line.rstrip().split('\t')
 			scaffold_name = '_'.join(line_list[1].split('_')[:-1])
-			scaffolds.add(scaffold_name)
+			scaffolds.append(scaffold_name)
 			initial_path_list = line_list[2].split(',')
 			scaffold_path_list = list()
 			for segment_string in initial_path_list:
@@ -129,22 +129,20 @@ def getGraph(graph_file, paths_file):
 			length_traversed = 0
 			for i in range(0, len(scaffold_path_list)):
 				if length_traversed < 100:
-					if scaffold_path_list[1][1] == '+':
+					if scaffold_path_list[i][1] == '+':
 						seg_ends.append(str(scaffold_path_list[i][0]) + 's')
 					else:
 						seg_ends.append(str(scaffold_path_list[i][0]) + 'e')
 					scaffold_ends.append(scaffold_name + 's')
 				else:
 					break
-				try:
-					length_traversed += segment_lengths[scaffold_path_list[i][0]]
-				except:
-					pdb.set_trace()
+
+				length_traversed += segment_lengths[scaffold_path_list[i][0]]
 
 			length_traversed = 0
 			for i in reversed(range(0, len(scaffold_path_list))):
 				if length_traversed < 100:
-					if segment_lengths[scaffold_path_list[i][1]] == '+':
+					if scaffold_path_list[i][1] == '+':
 						seg_ends.append(str(scaffold_path_list[i][0]) + 'e')
 					else:
 						seg_ends.append(str(scaffold_path_list[i][0]) + 's')
@@ -238,7 +236,7 @@ def bfs(graph, start_set):
 	explored = []
 	# Keep track of nodes to be checked
 	queue = []
-	for contig in start:
+	for contig in start_set:
 		queue.append(contig + 's')
 		queue.append(contig + 'e')
 
@@ -269,7 +267,10 @@ bin_table_path = os.path.abspath(args['bin_table'])
 cluster_column_heading = args['column']
 output_dir = os.path.abspath(args['output_dir'])
 graph_file_path = os.path.abspath(args['graph_file'])
-paths_file_path = os.path.abspath(args['paths_file'])
+if 'paths_file' in args and args['paths_file'] is not None:
+	paths_file_path = os.path.abspath(args['paths_file'])
+else:
+	paths_file_path = None
 
 # Check paths exist
 if not os.path.isfile(bin_table_path):
