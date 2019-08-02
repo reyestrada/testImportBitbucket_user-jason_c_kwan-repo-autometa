@@ -350,7 +350,6 @@ for bin_name in bin_contigs:
 	bin_bfs_sets[bin_name] = bfs(assembly_graph, bin_contigs[bin_name])
 
 # Now we work out which BFS sets overlap
-merge_done = True
 new_bfs_sets = dict() # Will hold new bfs_sets
 while bin_bfs_sets.keys():
 	bin_list = bin_bfs_sets.keys()
