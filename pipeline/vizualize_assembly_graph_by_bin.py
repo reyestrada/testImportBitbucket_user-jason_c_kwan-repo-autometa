@@ -232,28 +232,30 @@ def getGraph(graph_file, paths_file):
 	return graph
 
 def bfs(graph, start_set):
-	# Expects graph to be a dictionary of dictionaries, and start to be a set of starting nodes
+	# Expects graph to be a dictionary of dictionaries, and start to be a list of starting nodes
 	# The start set has bare contig names, whereas the graph has contig + 's'|'e'
 
 	# Keep track of all visited nodes
-	explored = []
+	explored = set()
 	# Keep track of nodes to be checked
-	queue = []
+	queue = set()
 	for contig in start_set:
-		queue.append(contig + 's')
-		queue.append(contig + 'e')
+		queue.add(contig + 's')
+		queue.add(contig + 'e')
 
 	# Keep looping until there are no nodes still to be checked
 	while queue:
 		# pop shallowest node (first node) from queue
-		node = queue.pop(0)
+		node_list = list(queue)
+		node = node_list[0]
+		queue.remove(node_list[0])
 		if node not in explored:
 			# add node to list of checked nodes
-			explored.append(node)
+			explored.add(node)
 			if node in graph:
 				for neighbor in graph[node]:
 					if neighbor not in explored:
-						queue.append(neighbor)
+						queue.add(neighbor)
 
 	return set(explored)
 
@@ -347,6 +349,7 @@ assembly_graph = getGraph(graph_file_path, paths_file_path)
 # We now make subgraphs for each bin (by BFS)
 bin_bfs_sets = dict() # Keyed by bin, holds BFS node sets
 for bin_name in bin_contigs:
+	print('BFS search for bin: ' + bin_name)
 	bin_bfs_sets[bin_name] = bfs(assembly_graph, bin_contigs[bin_name])
 
 # Now we work out which BFS sets overlap
