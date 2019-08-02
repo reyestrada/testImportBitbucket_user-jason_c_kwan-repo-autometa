@@ -125,32 +125,31 @@ def getGraph(graph_file, paths_file):
 		scaffold_ends = list()
 
 		# If the end segment on either side is < 100 bp then we add some more end tuples
-		if len(scaffold_path_list) > 1:
-			length_traversed = 0
-			for i in range(0, len(scaffold_path_list)):
-				if length_traversed < 100:
-					if scaffold_path_list[i][1] == '+':
-						seg_ends.append(str(scaffold_path_list[i][0]) + 's')
-					else:
-						seg_ends.append(str(scaffold_path_list[i][0]) + 'e')
-					scaffold_ends.append(scaffold_name + 's')
+		length_traversed = 0
+		for i in range(0, len(scaffold_path_list)):
+			if length_traversed < 100:
+				if scaffold_path_list[i][1] == '+':
+					seg_ends.append(str(scaffold_path_list[i][0]) + 's')
 				else:
-					break
+					seg_ends.append(str(scaffold_path_list[i][0]) + 'e')
+				scaffold_ends.append(scaffold_name + 's')
+			else:
+				break
 
-				length_traversed += segment_lengths[scaffold_path_list[i][0]]
+			length_traversed += segment_lengths[scaffold_path_list[i][0]]
 
-			length_traversed = 0
-			for i in reversed(range(0, len(scaffold_path_list))):
-				if length_traversed < 100:
-					if scaffold_path_list[i][1] == '+':
-						seg_ends.append(str(scaffold_path_list[i][0]) + 'e')
-					else:
-						seg_ends.append(str(scaffold_path_list[i][0]) + 's')
-					scaffold_ends.append(scaffold_name + 'e')
+		length_traversed = 0
+		for i in reversed(range(0, len(scaffold_path_list))):
+			if length_traversed < 100:
+				if scaffold_path_list[i][1] == '+':
+					seg_ends.append(str(scaffold_path_list[i][0]) + 'e')
 				else:
-					break
+					seg_ends.append(str(scaffold_path_list[i][0]) + 's')
+				scaffold_ends.append(scaffold_name + 'e')
+			else:
+				break
 
-				length_traversed += segment_lengths[scaffold_path_list[i][0]]
+			length_traversed += segment_lengths[scaffold_path_list[i][0]]
 
 		for i in range(len(seg_ends)):
 			if seg_ends[i] in end_segments:
