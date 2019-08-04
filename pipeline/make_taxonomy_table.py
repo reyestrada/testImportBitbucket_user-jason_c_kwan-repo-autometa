@@ -422,32 +422,22 @@ if not os.path.isfile(taxonomy_table) or os.stat(taxonomy_table).st_size == 0:
 else:
 	print('taxonomy.tab exists... Splitting original contigs into kingdoms')
 
+if single_genome_mode:
+	print('Done!')
+	exit(0)
+
 # Split the original contigs into sets for each kingdom
-taxonomy_pd = pd.read_table(taxonomy_table)
-categorized_seq_objects = {}
-all_seq_records = {}
-
-# Load fasta file
-for seq_record in SeqIO.parse(filtered_assembly, 'fasta'):
-	all_seq_records[seq_record.id] = seq_record
-
-for i, row in taxonomy_pd.iterrows():
-	kingdom = row['kingdom']
-	contig = row['contig']
-	if contig not in all_seq_records:
-		#Using filtered assembly, taxonomy.tab contains contigs not filtered
-		print('{0} below length filter, skipping.'.format(contig))
-		continue
-	if kingdom in categorized_seq_objects:
-		categorized_seq_objects[kingdom].append(all_seq_records[contig])
-	else:
-		categorized_seq_objects[kingdom] = [ all_seq_records[contig] ]
-
 # Now we write the component fasta files
-if not single_genome_mode:
-	for kingdom in categorized_seq_objects:
-		seq_list = categorized_seq_objects[kingdom]
-		output_path = output_dir + '/' + kingdom + '.fasta'
-		SeqIO.write(seq_list, output_path, 'fasta')
+taxonomy_df = pd.read_csv(taxonomy_table, sep='\t', index_col='contig')
+# Load fasta file
+all_seqs = SeqIO.to_dict(SeqIO.parse(filtered_assembly, 'fasta'))
+kingdoms = dict(list(taxonomy_df.groupby('kingdom')))
+print('Placing contigs above {} bp in corresponding kingdom fasta files'.format(length_cutoff))
+for kingdom,df in kingdoms.items():
+	df = df[df.length >= length_cutoff]
+	outfpath = os.path.join(output_dir, '{}.fasta'.format(kingdom))
+	recs = [all_seqs[ctg] for ctg in df.index]
+	seqs = SeqIO.write(recs, outfpath, 'fasta')
+	print('{}: {} seqs'.format(kingdom,len(seqs)))
 
-print "Done!"
+print('Done!')

@@ -42,8 +42,8 @@ def isConsistentWithOtherOrfs(taxid, rank, ctg_lcas, nodes_dict):
     in a contig, with rank equal to or above the given rank, are common
     ancestors of the taxid.  If the majority are, this function returns True,
     otherwise it returns False
+    ctg_lcas = {ctg:{canonical_rank:{taxid:num_hits,...},...},ctg2:{...},...}
     """
-    # ctg_lcas = {ctg:{canonical_rank:{taxid:num_hits,...},...},ctg2:{...},...}
     # First we make a modified rank_priority list that only includes the current rank and above
     rank_index = rank_priority.index(rank)
     ranks_to_consider = rank_priority[rank_index:]
@@ -191,7 +191,6 @@ def parse_lca(lca_fpath):
     wc_output = subprocess.check_output(['wc', '-l', lca_fpath])
     wc_list = wc_output.split()
     number_of_lines = int(wc_list[0])
-    number_of_proteins = {}
     lca_hits = {}
     # lca_hits[contig][rank][taxid] (running total of each thing)
     fh = open(lca_fpath)
@@ -203,11 +202,6 @@ def parse_lca(lca_fpath):
             while rank not in set(rank_priority):
                 taxid = nodes[taxid]['parent']
                 rank = nodes[taxid]['rank']
-        # Count number of proteins per contig
-        if contig in number_of_proteins:
-            number_of_proteins[contig] += 1
-        else:
-            number_of_proteins[contig] = 1
 
         # Keep running total of taxids for each contig
         if contig not in lca_hits:
@@ -233,7 +227,7 @@ def rank_taxids(ctg_lcas):
     for contig in tqdm(ctg_lcas, total=n_contigs):
         acceptedTaxid = None
         for rank in rank_priority:
-            if acceptedTaxid is not None:
+            if acceptedTaxid:
                 break
             # Order in descending order of votes
             if rank in ctg_lcas[contig]:
@@ -247,7 +241,7 @@ def rank_taxids(ctg_lcas):
         # If acceptedTaxid is still None at this point, there was some kind of
         # draw, so we need to find the lowest taxonomic level where there is a
         # majority
-        if acceptedTaxid is None:
+        if not acceptedTaxid:
             acceptedTaxid = lowest_majority(ctg_lcas[contig], nodes)
 
         top_taxids[contig] = acceptedTaxid
@@ -306,11 +300,11 @@ def write_taxa(ranked_ctgs, contig_table_fpath, outfpath):
             ranked_ctgs[ctg] = {}
             for rank in rank_priority:
                 ranked_ctgs[ctg][rank] = 'unclassified'
-                ranked_ctgs[ctg]['taxid'] = 'unclassified'
+                ranked_ctgs[ctg]['taxid'] = -1
 
         new_line = [ranked_ctgs[ctg][rank] for rank in reversed(rank_priority)]
         new_line.insert(0, original_line)
-        new_line.append(str(ranked_ctgs[ctg]['taxid']))
+        new_line.append(ranked_ctgs[ctg]['taxid'])
 
         outline = '\t'.join(map(str, new_line)) + '\n'
         outfile.write(outline)
@@ -319,7 +313,8 @@ def write_taxa(ranked_ctgs, contig_table_fpath, outfpath):
 
 
 if not len(sys.argv) == 5:
-    usage = 'Usage: add_contig_taxonomy.py <contig_table_path> <tax_table_path> <taxdump_dir_path> <output_file_path>'
+    usage = 'Usage: add_contig_taxonomy.py <contig_table_path> <tax_table_path>'\
+    ' <taxdump_dir_path> <output_file_path>'
     exit(usage)
 
 contig_tab_path = sys.argv[1]
