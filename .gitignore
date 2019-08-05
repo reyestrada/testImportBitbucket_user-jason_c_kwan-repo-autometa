@@ -1,0 +1,5 @@
+*log
+pipeline/*.c
+pipeline/*.so
+build/
+test_data/*

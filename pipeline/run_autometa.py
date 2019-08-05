@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.7
 
 # Copyright 2018 Ian J. Miller, Evan Rees, Izaak Miller, Jason C. Kwan
 #
@@ -22,10 +22,51 @@ import subprocess
 import time
 import logging
 import os
+import platform
+import shutil
 
 from multiprocessing import cpu_count
 from argparse import ArgumentParser
 from argparse import ArgumentDefaultsHelpFormatter
+
+def init_logger(autom_path, db_path, out_path):
+	#logger
+	logger = logging.getLogger(out_path + '/run_autometa.py')
+	hdlr = logging.FileHandler(out_path + '/run_autometa.log')
+	formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+	hdlr.setFormatter(formatter)
+	logger.addHandler(hdlr)
+	logger.setLevel(logging.DEBUG)
+
+	#Check user CPUs
+	# NOTE: As far as I can tell this is not being used in this script
+	#user_CPU_number = cpu_count()
+
+	# Output current branch and commit
+	branch_command = "git -C " + autom_path + " branch | grep \* | sed 's/^..//'"
+	branch = subprocess.Popen(branch_command, shell=True, stdout=subprocess.PIPE).communicate()[0].rstrip()
+
+	commit_command = 'git -C ' + autom_path + ' rev-parse --short HEAD'
+	commit = subprocess.Popen(commit_command, shell=True, stdout=subprocess.PIPE).communicate()[0].rstrip()
+	logger.info('Autometa branch: {}'.format(branch))
+	logger.info('Autometa commit: {}'.format(commit))
+	#Check programs
+	progs = ['md5sum','gzip','tar','gunzip','wget']
+	for prog in progs:
+		prog_version = subprocess.check_output([prog,'--version']).split('\n')[0]
+		logger.info('{}'.format(prog_version))
+	#Check 3rd party dependencies
+	dmnd_v = subprocess.check_output(['diamond','version']).strip()
+	logger.info('{}'.format(dmnd_v))
+	hmmscan_v = subprocess.check_output(['hmmpress','-h']).split('\n')[1].replace('# ','')
+	logger.info('{}'.format(hmmscan_v))
+	prodigal_v = subprocess.Popen("prodigal -v", stderr=subprocess.PIPE, shell=True).communicate()[1].replace('\n','')
+	logger.info('{}'.format(prodigal_v))
+	logger.info('DB Dir: {}'.format(db_path))
+	db_fpaths = os.listdir(db_path)
+	for fpath in db_fpaths:
+		logger.info('DB (fname, size): {} {}'.format(fpath, os.stat(db_path+'/'+fpath).st_size))
+	return logger
 
 def run_command(command_string, stdout_path = None):
 	# Function that checks if a command ran properly. If it didn't, then print an error message then quit
@@ -58,6 +99,22 @@ def cythonize_lca_functions():
 	os.chdir(pipeline_path)
 	run_command("python setup_lca_functions.py build_ext --inplace")
 	os.chdir(current_dir)
+
+def lca_compilation_check():
+	lca_funcs_so = os.path.join(pipeline_path, 'lca_functions.so')
+	lca_fp = os.path.join(pipeline_path, 'lca.py')
+	if not os.path.isfile(lca_funcs_so):
+		cythonize_lca_functions()
+	elif os.path.getmtime(lca_funcs_so) < os.path.getmtime(lca_fp):
+		print('lca.py updated. Recompiling lca functions.')
+		build_dir = os.path.join(pipeline_path, 'build')
+		lca_funcs_c = lca_funcs_so.replace('.so','.c')
+		os.remove(lca_funcs_c)
+		os.remove(lca_funcs_so)
+		shutil.rmtree(build_dir)
+		cythonize_lca_functions()
+	else:
+		print('lca_functions up-to-date')
 
 def run_make_taxonomy_tab(fasta, length_cutoff):
 	"""Runs make_taxonomy_table.py and directs output to taxonomy.tab for run_autometa.py"""
@@ -194,39 +251,14 @@ taxonomy_table_path = args['taxonomy_table']
 output_dir = os.path.abspath(args['output_dir'])
 do_ML_recruitment = args['ML_recruitment']
 make_tax_table = args['maketaxtable']
-db_dir_path = args['db_dir']
+db_dir_path = os.path.abspath(args['db_dir'])
 cov_table = args['cov_table']
 
 # Make output directory if it doesn't exist
 if not os.path.isdir(output_dir):
 	os.makedirs(output_dir)
 
-#logger
-logger = logging.getLogger(output_dir + '/run_autometa.py')
-hdlr = logging.FileHandler(output_dir + '/run_autometa.log')
-formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-hdlr.setFormatter(formatter)
-logger.addHandler(hdlr)
-logger.setLevel(logging.DEBUG)
-
-#Check user CPUs
-user_CPU_number = cpu_count()
-
-
-
-# Output current branch and commit
-branch_command = "git -C " + autometa_path + " branch | grep \* | sed 's/^..//'"
-branch = subprocess.Popen(branch_command, shell=True, stdout=subprocess.PIPE).communicate()[0].rstrip()
-
-commit_command = 'git -C ' + autometa_path + ' rev-parse --short HEAD'
-commit = subprocess.Popen(commit_command, shell=True, stdout=subprocess.PIPE).communicate()[0].rstrip()
-
-logger.info('Currently running branch ' + branch + ', commit ' + commit)
-
-#check if appropriate databases specified for make taxonomy table
-if make_tax_table and not db_dir_path:
-	print("Must specify databases directory (-db)")
-	exit(1)
+logger = init_logger(autometa_path, db_dir_path, output_dir)
 
 #check if fasta in path
 if not os.path.isfile(fasta_assembly):
@@ -257,6 +289,9 @@ else:
 	contig_table = make_contig_table(filtered_assembly)
 marker_tab_path = make_marker_table(filtered_assembly)
 
+# Ensure lca functions are compiled and up-to-date
+lca_compilation_check()
+
 # Make combined table
 if taxonomy_table_path and not make_tax_table:
 	combined_table_path = combine_tables(taxonomy_table_path, marker_tab_path)
@@ -264,23 +299,17 @@ elif taxonomy_table_path and make_tax_table:
 	if not os.path.isfile(taxonomy_table_path):
 		print "Could not find {}, running make_taxonomy_table.py".format(taxonomy_table_path)
 		logger.debug('Could not find {}, running make_taxonomy_table.py'.format(taxonomy_table_path))
-		if not os.path.isfile(pipeline_path+"/lca_functions.so"):
-			cythonize_lca_functions()
 		taxonomy_table_path = run_make_taxonomy_tab(fasta_assembly, length_cutoff)
 		combined_table_path = combine_tables(taxonomy_table_path, marker_tab_path)
 	elif os.path.isfile(taxonomy_table_path) and os.stat(taxonomy_table_path).st_size == 0:
 		print "{} file is empty, running make_taxonomy_table.py".format(taxonomy_table_path)
 		logger.debug('{} file is empty, running make_taxonomy_table.py'.format(taxonomy_table_path))
-		if not os.path.isfile(pipeline_path+"/lca_functions.so"):
-			cythonize_lca_functions()
 		taxonomy_table_path = run_make_taxonomy_tab(fasta_assembly, length_cutoff)
 		combined_table_path = combine_tables(taxonomy_table_path, marker_tab_path)
 	else:
 		print "{} already exists, not performing make_taxonomy_table.py".format(taxonomy_table_path)
 		combined_table_path = combine_tables(taxonomy_table_path, marker_tab_path)
 elif not taxonomy_table_path and make_tax_table:
-	if not os.path.isfile(pipeline_path+"/lca_functions.so"):
-		cythonize_lca_functions()
 	taxonomy_table_path = run_make_taxonomy_tab(fasta_assembly, length_cutoff)
 	combined_table_path = combine_tables(taxonomy_table_path, marker_tab_path)
 else:

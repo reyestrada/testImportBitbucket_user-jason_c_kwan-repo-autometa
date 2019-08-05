@@ -1,9 +1,9 @@
 Autometa
-========
+=========
 
 An automated binning pipeline for single metagenomes, in particular host-associated and highly complex ones. Autometa is copyright 2018 Ian J. Miller, Evan Rees, Izaak Miller and Jason C. Kwan, and is released under the GNU Affero General Public License v3 (see LICENSE.txt). If you find Autometa useful to your work, please cite:
 
-Miller, I. J.; Rees, E. R.; Ross, J.; Miller, I.; Baxa, J.; Lopera, J.; Kerby, R. L.; Rey, F. E.; Kwan, J. C. Autometa: Automated extraction of microbial genomes from individual shotgun metagenomes. *bioRxiv*, **2018**. [DOI: https://doi.org/10.1101/251462](https://www.biorxiv.org/content/early/2018/01/22/251462)
+Miller, I. J.; Rees, E. R.; Ross, J.; Miller, I.; Baxa, J.; Lopera, J.; Kerby, R. L.; Rey, F. E.; Kwan, J. C. Autometa: Automated extraction of microbial genomes from individual shotgun metagenomes. *Nucleic Acids Research*, **2019**. [DOI: https://doi.org/10.1093/nar/gkz148](https://doi.org/10.1093/nar/gkz148)
 
 Dependencies
 ------------
@@ -216,11 +216,11 @@ recursive\_dbscan\_output.tab | Output table containing the cluster (bin) for ea
 In this step we use supervised machine learning to classify the unclustered contigs to the bins that we have produced (formally, the bins produced in step 2 are the training set). Depending on the size of your dataset, this step can be computationally intensive.
 
 ```
-ML_recruitment.py --contig_tab recursive_dbscan_output.tab --recursive \
+ML_recruitment.py --contig_tab recursive_dbscan_output.tab \
 	--k_mer_matrix k-mer_matrix --out_table ML_recruitment_output.tab
 ```
 
-In the above command, we give ML\_recruitment.py the output table from step 2 (recursive\_dbscan\_output.tab), as well as the k-mer\_matrix file produced in step 2, and specify the output file (ML\_recruitment\_output.tab). We also use the --recursive flag, specifying that the script will run recursively, adding contigs it classifies to the training set and re-classifying until 0 more classifications are yielded. By default, classifications are only made if 10 out of 10 repeat classifications agree, and only if the classification would not increase the apparent contamination estimated by the presence of single-copy marker genes.
+In the above command, we give ML\_recruitment.py the output table from step 2 (recursive\_dbscan\_output.tab), as well as the k-mer\_matrix file produced in step 2, and specify the output file (ML\_recruitment\_output.tab). By default, classifications are only made if 10 out of 10 repeat classifications agree, and only if the classification would not increase the apparent contamination estimated by the presence of single-copy marker genes.
 
 The specified output file is a table with the following columns:
 
@@ -300,7 +300,7 @@ Cluster\_process.py gives you some information about the clusters, but it's a go
 library(ggplot2)
 data = read.table('ML_recruitment_output.tab', header=TRUE, sep='\t')
 ggplot( data, aes( x = bh_tsne_x, y = bh_tsne_y, col = ML_expanded_clustering )) + \
-	geom_point( aes( alphs = 0.5, size = sqrt( data$length ) / 100 )) + \
+	geom_point( aes( alpha = 0.5, size = sqrt( data$length ) / 100 )) + \
 	guides( color = 'legend', size = 'none', alpha = 'none' ) + \
 	theme_classic() + xlab('BH-tSNE X') + ylab('BH-tSNE Y') + \
 	guides( color = guide_legend( title = 'Cluster/bin' ))
@@ -314,7 +314,7 @@ In addition to using nucleotide composition, Autometa uses coverage and can also
 
 ```
 ggplot( data, aes( x = bh_tsne_x, y = bh_tsne_y, col = phylum )) + \
-	geom_point( aes( alphs = 0.5, size = sqrt( data$length ) / 100 )) + \
+	geom_point( aes( alpha = 0.5, size = sqrt( data$length ) / 100 )) + \
 	guides( color = 'legend', size = 'none', alpha = 'none' ) + \
 	theme_classic() + xlab('BH-tSNE X') + ylab('BH-tSNE Y') + \
 	guides( color = guide_legend( title = 'Phylum' ))
@@ -326,7 +326,7 @@ In the above plot, we have now colored the points by taxonomic phylum, and this 
 
 ```
 ggplot( data, aes( x = cov, y = gc, col = ML_expanded_clustering )) + \
-	geom_point( aes( alphs = 0.5, size = sqrt( data$length ) / 100 )) + \
+	geom_point( aes( alpha = 0.5, size = sqrt( data$length ) / 100 )) + \
 	guides( color = 'legend', size = 'none', alpha = 'none' ) + \
 	theme_classic() + xlab('Coverage') + ylab('GC (%)') + \
 	guides( color = guide_legend( title = 'Cluster/bin' )) + \

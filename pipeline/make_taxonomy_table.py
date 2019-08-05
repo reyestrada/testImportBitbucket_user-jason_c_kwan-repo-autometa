@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.7
 
 # Copyright 2018 Ian J. Miller, Evan R. Rees, Izaak Miller, Jason C. Kwan
 #
@@ -20,6 +20,8 @@ import sys
 import urllib2
 import subprocess
 import os
+import platform
+import shutil
 
 import pandas as pd
 from argparse import ArgumentParser
@@ -37,7 +39,7 @@ def run_command(command_string, stdout_path = None):
 		exit_code = subprocess.call(command_string, shell=True)
 
 	if exit_code != 0:
-		print('Make_taxonomy_table.py: Error, the command:')
+		print('make_taxonomy_table.py: Error, the command:')
 		print(command_string)
 		print('failed, with exit code ' + str(exit_code))
 		exit(1)
@@ -62,13 +64,27 @@ def cythonize_lca_functions():
 	run_command("python setup_lca_functions.py build_ext --inplace")
 	os.chdir(current_dir)
 
+def lca_compilation_check():
+	lca_funcs_so = os.path.join(pipeline_path, 'lca_functions.so')
+	lca_fp = os.path.join(pipeline_path, 'lca.py')
+	if not os.path.isfile(lca_funcs_so):
+		cythonize_lca_functions()
+	elif os.path.getmtime(lca_funcs_so) < os.path.getmtime(lca_fp):
+		print('lca.py updated. Recompiling lca functions.')
+		build_dir = os.path.join(pipeline_path, 'build')
+		lca_funcs_c = lca_funcs_so.replace('.so','.c')
+		os.remove(lca_funcs_c)
+		os.remove(lca_funcs_so)
+		shutil.rmtree(build_dir)
+		cythonize_lca_functions()
+	else:
+		print('lca_functions up-to-date')
+
 def download_file(destination_dir, file_url, md5_url):
 	filename = os.path.basename(file_url)
 	md5name = os.path.basename(md5_url)
 
-	md5check = False
-
-	while md5check == False:
+	while True:
 		run_command('wget {} -O {}'.format(file_url, destination_dir + '/' + filename))
 		run_command('wget {} -O {}'.format(md5_url, destination_dir + '/' + md5name))
 
@@ -78,7 +94,10 @@ def download_file(destination_dir, file_url, md5_url):
 			check_md5 = check_md5_file.readline().split(' ')[0]
 
 		if downloaded_md5 == check_md5:
-			md5check = True
+			print('md5 checksum successful. Continuing...')
+			break
+		else:
+			print('md5 checksum unsuccessful. Retrying...')
 
 def md5IsCurrent(local_md5_path, remote_md5_url):
 	remote_md5_handle = urllib2.urlopen(remote_md5_url)
@@ -105,7 +124,7 @@ def update_dbs(database_path, db='all'):
 		# First download nr if we don't yet have it OR it is not up to date
 		if os.path.isfile(database_path + '/nr.gz.md5'):
 			if not md5IsCurrent(database_path + '/nr.gz.md5', nr_db_md5_url):
-				print("updating nr.dmnd")
+				print("md5 is not current. Updating nr.dmnd")
 				download_file(database_path, nr_db_url, nr_db_md5_url)
 		else:
 			print("updating nr.dmnd")
@@ -123,7 +142,7 @@ def update_dbs(database_path, db='all'):
 		# Download prot.accession2taxid.gz only if the version we have is not current
 		if os.path.isfile(database_path + '/prot.accession2taxid.gz.md5'):
 			if not md5IsCurrent(database_path + '/prot.accession2taxid.gz.md5', accession2taxid_md5_url):
-				print("updating prot.accession2taxid")
+				print("md5 is not current. Updating prot.accession2taxid")
 				download_file(database_path, accession2taxid_url, accession2taxid_md5_url)
 		else:
 			print("updating prot.accession2taxid")
@@ -192,27 +211,28 @@ def run_prodigal(path_to_assembly):
 		run_command('prodigal -i {} -a {}/{}.orfs.faa -p meta -m -o {}/{}.txt'\
 		.format(path_to_assembly, output_dir, assembly_fname, output_dir, assembly_fname))
 
-def run_diamond(prodigal_output, diamond_db_path, num_processors, prodigal_daa):
-	view_output = prodigal_output + ".tab"
-	tmp_dir_path = os.getcwd() + '/tmp'
+def run_diamond(prodigal_output, diamond_db_path, num_processors, prodigal_diamond):
+	view_output = prodigal_output + ".blastp"
+	tmp_dir_path = os.path.dirname(prodigal_output) + '/tmp'
 	if not os.path.isdir(tmp_dir_path):
 		os.makedirs(tmp_dir_path) # This will give an error if the path exists but is a file instead of a dir
 	error = run_command_return("diamond blastp --query {0}.faa --db {1} \
-	--evalue 1e-5 --max-target-seqs 200 -p {2} --daa {3} -t {4}"\
-	.format(prodigal_output, diamond_db_path, num_processors, prodigal_daa, tmp_dir_path))
+	--evalue 1e-5 --max-target-seqs 200 -p {2} --outfmt 6 --out {3} -t {4}"\
+	.format(prodigal_output, diamond_db_path, num_processors, prodigal_diamond, tmp_dir_path))
+
 	# If there is an error, attempt to rebuild NR
-	if error == 134:
+	if error == 134 or error == str(134):
 		print('Fatal: Not enough disk space for diamond alignment archive!')
 		exit(1)
 	if error:
 		print('Error when performing diamond blastp:\n{}\nAttempting to correct by rebuilding nr...'.format(error))
 		update_dbs(db_dir_path, 'nr')
-		run_command("diamond blastp --query {0}.faa --db {1} --evalue 1e-5 \
-		--max-target-seqs 200 -p {2} --daa {3} -t {4}"\
-		.format(prodigal_output, diamond_db_path, num_processors, prodigal_daa, tmp_dir_path))
 
-	run_command("diamond view -a {} -f tab -o {}".format(prodigal_daa, view_output))
-	return view_output
+		run_command("diamond blastp --query {0}.faa --db {1} --evalue 1e-5 \
+		--max-target-seqs 200 -p {2} --outfmt 6 --out {3} -t {4}"\
+		.format(prodigal_output, diamond_db_path, num_processors, prodigal_diamond, tmp_dir_path))
+
+	return prodigal_diamond
 
 #blast2lca using accession numbers#
 def run_blast2lca(input_file, taxdump_path):
@@ -295,10 +315,11 @@ fasta_path = args['assembly']
 cov_table = args['cov_table']
 output_dir = args['output_dir']
 single_genome_mode = args['single_genome']
+
 bgcs_dir = args['bgcs_dir']
 fasta_fname, _ = os.path.splitext(os.path.basename(fasta_path))
 prodigal_output = '/'.join([output_dir, fasta_fname + ".filtered.orfs"])
-prodigal_daa = prodigal_output + ".daa"
+prodigal_diamond = prodigal_output + ".blastp"
 
 # If cov_table defined, we need to check the file exists
 if cov_table:
@@ -310,8 +331,7 @@ if cov_table:
 if not os.path.isdir(output_dir):
 	os.makedirs(output_dir)
 
-if not os.path.isfile(pipeline_path+"/lca_functions.so"):
-	cythonize_lca_functions()
+lca_compilation_check()
 
 if not os.path.isdir(db_dir_path):
 	#Verify the 'Autometa databases' directory exists
@@ -360,14 +380,18 @@ if not os.path.isfile(prodigal_output + ".faa"):
 	#Check for file and if it doesn't exist run make_marker_table
 	run_prodigal(filtered_assembly)
 
-if not os.path.isfile(prodigal_daa):
-	print "Could not find {}. Running diamond blast... ".format(prodigal_daa)
-	diamond_output = run_diamond(prodigal_output, diamond_db_path, num_processors, prodigal_daa)
-elif os.stat(prodigal_output + ".daa").st_size == 0:
-	print "{} file is empty. Re-running diamond blast...".format(prodigal_daa)
-	diamond_output = run_diamond(prodigal_output, diamond_db_path, num_processors, prodigal_daa)
+if not os.path.isfile(prodigal_diamond):
+	print "Could not find {}. Running diamond blast... ".format(prodigal_diamond)
+	diamond_output = run_diamond(prodigal_output, diamond_db_path, num_processors, prodigal_diamond)
+elif os.stat(prodigal_diamond).st_size == 0:
+	print "{} file is empty. Re-running diamond blast...".format(prodigal_diamond)
+	diamond_output = run_diamond(prodigal_output, diamond_db_path, num_processors, prodigal_diamond)
+elif not os.path.isfile(prodigal_diamond):
+	print "{0} not found. \nExiting..."\
+ 	.format(prodigal_diamond)
+	exit(1)
 else:
-	diamond_output = prodigal_output + ".tab"
+	diamond_output = prodigal_diamond
 
 if not os.path.isfile(prodigal_output + ".lca"):
 	print "Could not find {}. Running lca...".format(prodigal_output + ".lca")
@@ -398,32 +422,22 @@ if not os.path.isfile(taxonomy_table) or os.stat(taxonomy_table).st_size == 0:
 else:
 	print('taxonomy.tab exists... Splitting original contigs into kingdoms')
 
+if single_genome_mode:
+	print('Done!')
+	exit(0)
+
 # Split the original contigs into sets for each kingdom
-taxonomy_pd = pd.read_table(taxonomy_table)
-categorized_seq_objects = {}
-all_seq_records = {}
-
-# Load fasta file
-for seq_record in SeqIO.parse(filtered_assembly, 'fasta'):
-	all_seq_records[seq_record.id] = seq_record
-
-for i, row in taxonomy_pd.iterrows():
-	kingdom = row['kingdom']
-	contig = row['contig']
-	if contig not in all_seq_records:
-		#Using filtered assembly, taxonomy.tab contains contigs not filtered
-		print('{0} below length filter, skipping.'.format(contig))
-		continue
-	if kingdom in categorized_seq_objects:
-		categorized_seq_objects[kingdom].append(all_seq_records[contig])
-	else:
-		categorized_seq_objects[kingdom] = [ all_seq_records[contig] ]
-
 # Now we write the component fasta files
-if not single_genome_mode:
-	for kingdom in categorized_seq_objects:
-		seq_list = categorized_seq_objects[kingdom]
-		output_path = output_dir + '/' + kingdom + '.fasta'
-		SeqIO.write(seq_list, output_path, 'fasta')
+taxonomy_df = pd.read_csv(taxonomy_table, sep='\t', index_col='contig')
+# Load fasta file
+all_seqs = SeqIO.to_dict(SeqIO.parse(filtered_assembly, 'fasta'))
+kingdoms = dict(list(taxonomy_df.groupby('kingdom')))
+print('Placing contigs above {} bp in corresponding kingdom fasta files'.format(length_cutoff))
+for kingdom,df in kingdoms.items():
+	df = df[df.length >= length_cutoff]
+	outfpath = os.path.join(output_dir, '{}.fasta'.format(kingdom))
+	recs = [all_seqs[ctg] for ctg in df.index]
+	seqs = SeqIO.write(recs, outfpath, 'fasta')
+	print('{}: {} seqs'.format(kingdom,len(seqs)))
 
-print "Done!"
+print('Done!')
