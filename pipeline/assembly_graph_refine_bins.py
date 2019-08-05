@@ -28,6 +28,7 @@ import math
 from itertools import combinations
 from scipy import stats
 import csv
+import operator
 
 # See https://stackoverflow.com/questions/2413522/weighted-standard-deviation-in-numpy
 def weighted_av_and_stdev(values, weights):
@@ -326,6 +327,7 @@ bin_table_path = args['bin_table']
 cluster_column_heading = args['column']
 output_dir = args['output_dir']
 graph_file_path = args['graph_file']
+length_cutoff = args['length_cutoff']
 
 # Check paths exist
 if not os.path.isfile(bin_table_path):
@@ -415,7 +417,7 @@ bfs_sets = dict() # Dictionary, holds sets of contigs by bin
 
 for bin_name in bin_sets:
 	contig_list = list(bin_sets[bin_name])
-	bfs_sets[bin_name] = bfs(connection_graph, contig_list, bin_name)
+	bfs_sets[bin_name] = bfs(assembly_graph, contig_list, bin_name)
 
 # Make a new dataset with simple contig names (i.e. without 's' and 'e' on the end)
 bfs_sets_simple = dict()
@@ -540,6 +542,8 @@ for bin_name in bfs_sets_simple:
 
 for source_contig in assembly_graph:
 	for destination_contig in assembly_graph[source_contig]:
+		if source_contig[:-1] not in graph_refined_bins or destination_contig[:-1] not in graph_refined_bins:
+			continue
 		if graph_refined_bins[source_contig[:-1]] == graph_refined_bins[destination_contig[:-1]]:
 			# We now write the output to the relevant file
 			bin_name = graph_refined_bins[source_contig[:-1]]
