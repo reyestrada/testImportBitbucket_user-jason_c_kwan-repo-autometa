@@ -185,7 +185,7 @@ def parse_nodes(nodes_dmp_path):
     nodes_dmp.close()
     return(nodes)
 
-def parse_lca(lca_fpath):
+def parse_lca(lca_fpath, nodes_dict):
     print( strftime("%Y-%m-%d %H:%M:%S") + ' Parsing lca taxonomy table')
     # Work out number of lines in file
     wc_output = subprocess.check_output(['wc', '-l', lca_fpath])
@@ -200,9 +200,13 @@ def parse_lca(lca_fpath):
         taxid = int(taxid)
         if taxid != 1:
             while rank not in set(rank_priority):
-                taxid = nodes[taxid]['parent']
-                rank = nodes[taxid]['rank']
-
+                if taxid not in nodes_dict:
+                    print('{} taxid not in nodes.dmp.'.format(taxid))
+                    print('Update nodes.dmp and re-run')
+                    sys.exit(1)
+                else:
+                    taxid = nodes_dict[taxid]['parent']
+                    rank = nodes_dict[taxid]['rank']
         # Keep running total of taxids for each contig
         if contig not in lca_hits:
             lca_hits.update({contig:{rank:{taxid:1}}})
@@ -219,7 +223,7 @@ def parse_lca(lca_fpath):
     fh.close()
     return(lca_hits)
 
-def rank_taxids(ctg_lcas):
+def rank_taxids(ctg_lcas, nodes_dict):
 
     print(strftime("%Y-%m-%d %H:%M:%S") + ' Ranking taxids')
     n_contigs = len(ctg_lcas)
@@ -234,7 +238,7 @@ def rank_taxids(ctg_lcas):
                 ordered_taxids = sorted(ctg_lcas[contig][rank], key=lambda tid:ctg_lcas[contig][rank][tid], reverse=True)
                 #sys.exit()
                 for taxid in ordered_taxids:
-                    if isConsistentWithOtherOrfs(taxid, rank, ctg_lcas[contig], nodes):
+                    if isConsistentWithOtherOrfs(taxid, rank, ctg_lcas[contig], nodes_dict):
                         acceptedTaxid = taxid
                         break
 
@@ -242,12 +246,12 @@ def rank_taxids(ctg_lcas):
         # draw, so we need to find the lowest taxonomic level where there is a
         # majority
         if not acceptedTaxid:
-            acceptedTaxid = lowest_majority(ctg_lcas[contig], nodes)
+            acceptedTaxid = lowest_majority(ctg_lcas[contig], nodes_dict)
 
         top_taxids[contig] = acceptedTaxid
     return(top_taxids)
 
-def resolve_taxon_paths(ctg2taxid):
+def resolve_taxon_paths(ctg2taxid, nodes_dict, names_dict):
     print(strftime("%Y-%m-%d %H:%M:%S") + ' Resolving taxon paths')
     contig_paths = {}
     # {contig:{rank1:name1,rank2,name2},contig2:{rank1:name1,rank2:name2,...},...}
@@ -255,20 +259,20 @@ def resolve_taxon_paths(ctg2taxid):
     for contig in tqdm(ctg2taxid, total=n_contigs):
         taxid = ctg2taxid[contig]
         if taxid == 1:
-            contig_paths.update({contig:{'root':names[taxid]}})
+            contig_paths.update({contig:{'root':names_dict[taxid]}})
         while taxid != 1:
-            current_rank = nodes[taxid]['rank']
+            current_rank = nodes_dict[taxid]['rank']
             if current_rank not in set(rank_priority):
-                taxid = nodes[taxid]['parent']
+                taxid = nodes_dict[taxid]['parent']
                 continue
 
-            name = names[taxid]
+            name = names_dict[taxid]
 
             if contig not in contig_paths:
                 contig_paths.update({contig:{current_rank:name}})
             else:
                 contig_paths[contig][current_rank] = name
-            taxid = nodes[taxid]['parent']
+            taxid = nodes_dict[taxid]['parent']
 
         for rank in rank_priority:
             if rank not in contig_paths[contig]:
@@ -343,13 +347,13 @@ rank_priority = [
     'root']
 
 # retrieve lca taxids for each contig
-classifications = parse_lca(tax_table_path)
+classifications = parse_lca(tax_table_path, nodes)
 
 # Vote for majority lca taxid from contig lca taxids
-contigs_to_taxid = rank_taxids(classifications)
+contigs_to_taxid = rank_taxids(classifications, nodes)
 
 # Add all corresponding canonical ranks from voted taxid
-ranked_contigs = resolve_taxon_paths(contigs_to_taxid)
+ranked_contigs = resolve_taxon_paths(contigs_to_taxid, nodes, names)
 
 # Removing root for writing columns to table
 rank_priority.remove('root')
@@ -357,4 +361,4 @@ rank_priority.remove('root')
 # Add assigned canonical ranks and voted taxid to contig table
 write_taxa(ranked_contigs, contig_tab_path, output_file_path)
 
-print('written: {}'.format(os.path.abspath(output_file_path)))
+print('written: {}'.format(output_file_path))
