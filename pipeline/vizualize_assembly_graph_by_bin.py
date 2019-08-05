@@ -25,7 +25,7 @@ import os
 import pandas as pd
 import itertools
 import gzip
-
+import pdb
 def getGraph(graph_file, paths_file):
 	# Load graph file into memory
 	S_lines = list()
@@ -247,14 +247,14 @@ def bfs(graph, start_set):
 	while queue:
 		# pop shallowest node (first node) from queue
 		node_list = list(queue)
-		node = node_list[0]
-		queue.remove(node_list[0])
+		node = node_list.pop(0)
+		queue.remove(node)
 		if node not in explored:
 			# add node to list of checked nodes
 			explored.add(node)
 			if node in graph:
 				for neighbor in graph[node]:
-					if neighbor not in explored:
+					if (neighbor not in explored) and (neighbor not in queue):
 						queue.add(neighbor)
 
 	return set(explored)
@@ -345,13 +345,13 @@ color_table.close()
 
 # Load the graph
 assembly_graph = getGraph(graph_file_path, paths_file_path)
-
+pdb.set_trace()
 # We now make subgraphs for each bin (by BFS)
 bin_bfs_sets = dict() # Keyed by bin, holds BFS node sets
 for bin_name in bin_contigs:
 	print('BFS search for bin: ' + bin_name)
 	bin_bfs_sets[bin_name] = bfs(assembly_graph, bin_contigs[bin_name])
-
+pdb.set_trace()
 # Now we work out which BFS sets overlap
 new_bfs_sets = dict() # Will hold new bfs_sets
 while bin_bfs_sets.keys():
@@ -377,7 +377,7 @@ while bin_bfs_sets.keys():
 		# Move bin to the new data structure
 		new_bfs_sets[bin_to_check] = bin_bfs_sets[bin_to_check]
 		del bin_bfs_sets[bin_to_check]
-
+pdb.set_trace()
 # Now we output graphs for each merged bfs set
 filehandles = dict() # Keyed by new bin name
 nodes_explored = set() # Protects from writing a link if both nodes have already been explored
