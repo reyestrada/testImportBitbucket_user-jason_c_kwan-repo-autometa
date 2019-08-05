@@ -369,7 +369,8 @@ contig_coverages = dict()
 for i,row in master_table.iterrows():
 	contig = row['contig']
 	bin_name = row[cluster_column_heading]
-	color_table.write(contig + '\t' + bin_name + '\n')
+	color_table.write(contig + 's\t' + bin_name + '\n')
+	color_table.write(contig + 'e\t' + bin_name + '\n')
 	bin_lookup[contig] = bin_name
 	length = row['length']
 	gc = row['gc']
