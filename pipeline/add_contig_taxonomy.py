@@ -186,7 +186,7 @@ def parse_nodes(nodes_dmp_path):
     return(nodes)
 
 def parse_lca(lca_fpath, nodes_dict):
-    print( strftime("%Y-%m-%d %H:%M:%S") + ' Parsing lca taxonomy table')
+    print(strftime("%Y-%m-%d %H:%M:%S") + ' Parsing lca taxonomy table')
     # Work out number of lines in file
     wc_output = subprocess.check_output(['wc', '-l', lca_fpath])
     wc_list = wc_output.split()

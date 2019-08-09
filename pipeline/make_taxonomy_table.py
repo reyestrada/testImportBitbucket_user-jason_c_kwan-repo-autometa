@@ -437,7 +437,7 @@ for kingdom,df in kingdoms.items():
 	df = df[df.length >= length_cutoff]
 	outfpath = os.path.join(output_dir, '{}.fasta'.format(kingdom))
 	recs = [all_seqs[ctg] for ctg in df.index]
-	seqs = SeqIO.write(recs, outfpath, 'fasta')
-	print('{}: {} seqs'.format(kingdom,len(seqs)))
+	n_seqs = SeqIO.write(recs, outfpath, 'fasta')
+	print('{}: {} seqs'.format(kingdom,n_seqs))
 
 print('Done!')
