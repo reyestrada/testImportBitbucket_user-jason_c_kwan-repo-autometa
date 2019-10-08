@@ -105,12 +105,14 @@ def run_make_taxonomy_tab(fasta, length_cutoff):
 	"""Runs make_taxonomy_table.py and directs output to taxonomy.tab for run_autometa.py"""
 	# Note we don't have to supply the cov_table here because earlier in this script we already run make_contig_table.py
 	outfpath = output_dir + '/taxonomy.tab'
-	cmd = ' '.join(map(str,['{}/make_taxonomy_table.py'.format(pipeline_path),
+	cmd = ' '.join(map(str,[
+					os.path.join(pipeline_path,'make_taxonomy_table.py'),
 					'-a',fasta,
 					'-db',db_dir_path,
 					'-p',processors,
 					'-l',length_cutoff,
-					'-o',output_dir]))
+					'-o',output_dir
+				]))
 	if cov_table:
 		cmd += ' '.join(['', '-v', cov_table])
 	run_command(cmd)
@@ -141,7 +143,7 @@ def make_cov_table(asm_fpath, reads_fpath, dirpath, proc=1):
 	if os.path.isfile(cov_tab_fpath):
 		return cov_tab_fpath
 	cmd = ' '.join(map(str,[
-		'{}/calculate_read_coverage.py'.format(pipeline_path),
+		os.path.join(pipeline_path,'calculate_read_coverage.py'),
 		'-a',asm_fpath,
 		'-i',reads_fpath,
 		'-p',proc,
@@ -155,14 +157,14 @@ def make_contig_table(fasta, cov_tab_fpath=None):
 	outfname, _ = os.path.splitext(os.path.basename(fasta))
 	outfname += '.tab'
 	outfpath = os.path.join(output_dir, outfname)
-	cmd = ' '.join([
-		'{}/make_contig_table.py'.format(pipeline_path),
+	cmd = [
+		os.path.join(pipeline_path,'make_contig_table.py'),
 		'-a',fasta,
 		'-o',outfpath,
-	])
+	]
 	if cov_tab_fpath:
-		cmd += ' '.join(['', '-c', cov_tab_fpath])
-
+		cmd.extend(['-c', cov_tab_fpath])
+	cmd = ' '.join(cmd)
 	run_command(cmd)
 	return outfpath
 
@@ -189,9 +191,8 @@ def make_marker_table(fasta):
 	else:
 		print("Making marker tab w/prodigal & hmmscan")
 		logger.info('Making {}: Running prodigal and hmmscan'.format(outfname))
-		# run_command_quiet("hmmpress -f {}".format(hmm_marker_path))
 		cmd = ' '.join(map(str,[
-			'{}/make_marker_table.py'.format(pipeline_path),
+			os.path.join(pipeline_path,'make_marker_table.py'),
 			'-a',fasta,
 			'-m',hmm_marker_path,
 			'-c',hmm_cutoffs_path,
@@ -202,17 +203,17 @@ def make_marker_table(fasta):
 	return outfpath
 
 def recursive_dbscan(input_table, filtered_assembly, domain):
-	recursive_dbscan_output_path = output_dir + '/recursive_dbscan_output.tab'
+	dbscan_outfpath = os.path.join(output_dir,'recursive_dbscan_output.tab')
 	kmer_fpath = os.path.join(output_dir,'k-mer_matrix')
 	cmd = ' '.join([
-		'{}/recursive_dbscan.py'.format(pipeline_path),
+		os.path.join(pipeline_path,'recursive_dbscan.py'),
 		'-t',input_table,
 		'-a',filtered_assembly,
 		'-d',output_dir,
 		'-k',domain,
 	])
 	run_command(cmd)
-	return recursive_dbscan_output_path, kmer_fpath
+	return dbscan_outfpath, kmer_fpath
 
 def combine_tables(table1_path, table2_path):
 	comb_table_path = output_dir + '/combined_contig_info.tab'
@@ -249,15 +250,17 @@ def combine_tables(table1_path, table2_path):
 	return comb_table_path
 
 def ML_recruitment(input_table, matrix):
-	ML_recruitment_output_path = output_dir + '/ML_recruitment_output.tab'
-	cmd = ' '.join(map(str,['{}/ML_recruitment.py'.format(pipeline_path),
+	outfpath = os.path.join(output_dir,'ML_recruitment_output.tab')
+	cmd = ' '.join(map(str,[
+					os.path.join(pipeline_path,'ML_recruitment.py'),
 					'-t', input_table,
 					'-p', processors,
 					'-m', matrix,
-					'-o', ML_recruitment_output_path,
-					'-r']))
+					'-o', outfpath,
+					'-r'
+				]))
 	run_command(cmd)
-	return ML_recruitment_output_path
+	return outfpath
 
 def cami_format(infpath, out_dpath):
 	fpath, ext = os.path.splitext(infpath)
@@ -306,7 +309,7 @@ parser = ArgumentParser(description="Script to run the Autometa pipeline.",\
  epilog="Please do not forget to cite us. Thank you for using Autometa!",\
   formatter_class=ArgumentDefaultsHelpFormatter)
 parser.add_argument('-a', '--assembly', metavar='<assembly.fasta>', help='Path to metagenomic assembly fasta', required=True)
-parser.add_argument('-i', '--i_reads', metavar='<reads.fastq.gz>', help='/path/to/interleaved/reads', required=False)
+parser.add_argument('-i', '--i_reads', metavar='<reads.fastq.gz>', help='</path/to/interleaved/reads.fq>', required=False)
 parser.add_argument('-p', '--processors', metavar='<int>', help='Number of processors to use', type=int, default=1)
 parser.add_argument('-l', '--length_cutoff', metavar='<int>', help='Contig length cutoff to consider for binning in bp', default=10000, type=int)
 parser.add_argument('-c', '--completeness_cutoff', metavar='<float>', help='Completeness cutoff (in percent) to use for accepting clusters', type=float, default=20.0)
@@ -420,7 +423,7 @@ else:
 # input fasta
 if make_tax_table:
 	# First, check that the expected kingdom bin is there
-	expected_kingdom_bin_path = output_dir + '/' + kingdom.title() + '.fasta'
+	expected_kingdom_bin_path = os.path.join(output_dir, kingdom.title()+'.fasta')
 	if (not os.path.isfile(expected_kingdom_bin_path)) or os.stat(expected_kingdom_bin_path).st_size == 0:
 		print('Error at make_taxonomy_table.py stage - file {0} is either not there or empty'\
 			.format(expected_kingdom_bin_path))
@@ -429,12 +432,16 @@ if make_tax_table:
 	# Now change the input fasta to the output of make_taxonomy_table.py
 	filtered_assembly = expected_kingdom_bin_path
 
-recursive_dbscan_output, matrix_file = recursive_dbscan(combined_table_path, filtered_assembly, kingdom)
+binning_outfpath, matrix_file = recursive_dbscan(
+	combined_table_path,
+	filtered_assembly,
+	kingdom
+)
 
 if do_ML_recruitment:
-	ml_outfpath = ML_recruitment(recursive_dbscan_output, matrix_file)
+	binning_outfpath = ML_recruitment(binning_outfpath, matrix_file)
 
-master_outfpath = cami_format(ml_outfpath, output_dir)
+master_outfpath = cami_format(binning_outfpath, output_dir)
 elapsed_time = time.strftime('%H:%M:%S', time.gmtime(round((time.time() - start_time),2)))
 
 print('Wrote Binning outfile to {}'.format(master_outfpath))
