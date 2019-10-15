@@ -57,12 +57,12 @@ def run_command_return(command_string, stdout_path = None):
 
 	return exit_code
 
-def cythonize_lca_functions():
-	print("{}/lca_functions.so not found, cythonizing lca_function.pyx for make_taxonomy_table.py".format(pipeline_path))
-	current_dir = os.getcwd()
-	os.chdir(pipeline_path)
-	run_command("python setup_lca_functions.py build_ext --inplace")
-	os.chdir(current_dir)
+# def cythonize_lca_functions():
+# 	print("{}/lca_functions.so not found, cythonizing lca_function.pyx for make_taxonomy_table.py".format(pipeline_path))
+# 	current_dir = os.getcwd()
+# 	os.chdir(pipeline_path)
+# 	run_command("python setup_lca_functions.py build_ext --inplace")
+# 	os.chdir(current_dir)
 
 def download_file(destination_dir, file_url, md5_url):
 	filename = os.path.basename(file_url)
@@ -96,7 +96,7 @@ def md5IsCurrent(local_md5_path, remote_md5_url):
 		return False
 
 def update_dbs(database_path, db='all'):
-	"""Updates databases for AutoMeta usage"""
+	"""Updates databases for Autometa usage"""
 	taxdump_url = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz"
 	taxdump_md5_url = taxdump_url+".md5"
 	accession2taxid_url = "ftp://ftp.ncbi.nih.gov/pub/taxonomy/accession2taxid/prot.accession2taxid.gz"
@@ -157,7 +157,7 @@ def check_dbs(db_path):
 	Determines what files need to be downloaded/updated depending on
 	what database path was specified
 	'''
-	if db_path == autometa_path + '/databases':
+	if db_path == os.path.join(autometa_path,'databases'):
 		db_dict = {
 			'nr': ['nr.dmnd','nr.dmnd.md5','nr.gz.md5'],
 			'acc2taxid': ['prot.accession2taxid.gz.md5','prot.accession2taxid'],
@@ -173,16 +173,15 @@ def check_dbs(db_path):
 	for db in db_dict:
 		for fh in db_dict[db]:
 			if fh not in db_files:
-				print('{0} database not found, downloading/formatting.\n\
-				This may take some time...'.format(db))
-				update_dbs(db_path, db)
+				print('{0} database not found.'.format(db))
+				# update_dbs(db_path, db)
 
 def length_trim(fasta_fpath, length_cutoff, outdir):
 	input_fname, ext = os.path.splitext(os.path.basename(fasta_fpath))
 	#Trim the length of fasta file
 	outfp = '{}.filtered{}'.format(input_fname, ext)
 	outfile_path = os.path.join(outdir, outfp)
-	cmd = ' '.join(map(str,['{}/fasta_length_trim.py'.format(pipeline_path),
+	cmd = ' '.join(map(str,[os.path.join(pipeline_path,'fasta_length_trim.py'),
 							fasta_fpath,
 							length_cutoff,
 							outfile_path]))
@@ -422,10 +421,10 @@ if not os.path.isdir(output_dir):
 # else:
 # 	check_dbs(db_dir_path)
 
-names_dmp_path = db_dir_path + '/names.dmp'
-nodes_dmp_path = db_dir_path + '/nodes.dmp'
-accession2taxid_path = db_dir_path + '/prot.accession2taxid'
-diamond_db_path = db_dir_path + '/nr.dmnd'
+names_dmp_path = os.path.join(db_dir_path,'names.dmp')
+nodes_dmp_path = os.path.join(db_dir_path,'nodes.dmp')
+accession2taxid_path = os.path.join(db_dir_path,'prot.accession2taxid')
+diamond_db_path = os.path.join(db_dir_path,'nr.dmnd')
 # current_taxdump_md5 = db_dir_path + '/taxdump.tar.gz.md5'
 # current_acc2taxid_md5 = db_dir_path + '/prot.accession2taxid.gz.md5'
 # current_nr_md5 = db_dir_path + '/nr.gz.md5'
@@ -505,7 +504,7 @@ for i, row in taxonomy_df.iterrows():
 	contig = row['contig']
 	if contig not in all_seq_records:
 		#Using filtered assembly, taxonomy.tab contains contigs not filtered
-		print('{0} below length filter, skipping.'.format(contig))
+		print('{} below length filter, skipping.'.format(contig))
 		continue
 	if kingdom in categorized_seq_objects:
 		categorized_seq_objects[kingdom].append(all_seq_records[contig])

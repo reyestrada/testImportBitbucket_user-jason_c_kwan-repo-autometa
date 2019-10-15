@@ -1,7 +1,7 @@
-FROM continuumio/anaconda
-MAINTAINER Jason C. Kwan "jason.kwan@wisc.edu"
+FROM continuumio/miniconda
+MAINTAINER Evan R. Rees "erees@wisc.edu"
 
-# Copyright 2018 Ian J. Miller, Evan Rees, Izaak Miller, Jason C. Kwan
+# Copyright 2018 Ian J. Miller, Evan R. Rees, Izaak Miller, Jason C. Kwan
 #
 # This file is part of Autometa.
 #
@@ -12,20 +12,47 @@ MAINTAINER Jason C. Kwan "jason.kwan@wisc.edu"
 #
 # Autometa is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the 
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU Affero General Public License for more details.
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with Autometa. If not, see <http://www.gnu.org/licenses/>.
 
-RUN apt-get update
-RUN apt-get install -y prodigal hmmer build-essential zlib1g-dev bowtie2 bedtools libatlas-base-dev libncurses5-dev libncursesw5-dev libbz2-dev liblzma-dev
-RUN conda install -y tqdm joblib biopython
-RUN mkdir diamond && cd diamond && wget http://github.com/bbuchfink/diamond/releases/download/v0.9.14/diamond-linux64.tar.gz && tar xvf diamond-linux64.tar.gz
-RUN wget https://github.com/samtools/samtools/releases/download/1.6/samtools-1.6.tar.bz2
-RUN tar -vxjf samtools-1.6.tar.bz2
-RUN cd samtools-1.6 && ./configure --prefix=/samtools && make && make install
-RUN git clone https://github.com/danielfrg/tsne.git && cd tsne && python setup.py install
-RUN git clone https://bitbucket.org/jason_c_kwan/autometa && cd autometa/pipeline && python setup_lca_functions.py build_ext --inplace
+# Download and install dependencies
+RUN conda install -c bioconda -y \
+    prodigal \
+    hmmer \
+    bowtie2 \
+    bedtools \
+    diamond \
+    tqdm \
+    biopython \
+    samtools \
+    numpy \
+    pandas \
+    cython
 
-ENV PATH="/diamond:/autometa/pipeline:/samtools/bin:${PATH}"
+RUN conda update -y conda
+RUN apt-get update && apt-get install -y \
+    zlib1g-dev \
+    libc-dev \
+    libatlas-base-dev \
+    libncurses5-dev \
+    libncursesw5-dev \
+    libbz2-dev \
+    liblzma-dev \
+    build-essential
+
+# Download and install Autometa
+RUN git clone https://bitbucket.org/jason_c_kwan/autometa && \
+    cd autometa && \
+    git pull && \
+    git checkout cami2 && \
+    chmod 777 single-copy_markers/Bacteria_single_copy.hmm && \
+    chmod 777 single-copy_markers/Archaea_single_copy.hmm && \
+    hmmpress -f single-copy_markers/Bacteria_single_copy.hmm && \
+    hmmpress -f single-copy_markers/Archaea_single_copy.hmm
+
+RUN pip install tsne
+
+ENV PATH="/autometa/pipeline:${PATH}"

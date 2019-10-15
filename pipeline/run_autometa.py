@@ -94,12 +94,12 @@ def run_command_quiet(command_string):
 		print('failed, with exit code ' + str(exit_code))
 		exit(1)
 
-def cythonize_lca_functions():
-	logger.info("{}/lca_functions.so not found, cythonizing lca_function.pyx for make_taxonomy_table.py".format(pipeline_path))
-	current_dir = os.getcwd()
-	os.chdir(pipeline_path)
-	run_command("python setup_lca_functions.py build_ext --inplace")
-	os.chdir(current_dir)
+# def cythonize_lca_functions():
+# 	logger.info("{}/lca_functions.so not found, cythonizing lca_function.pyx for make_taxonomy_table.py".format(pipeline_path))
+# 	current_dir = os.getcwd()
+# 	os.chdir(pipeline_path)
+# 	run_command("python setup_lca_functions.py build_ext --inplace")
+# 	os.chdir(current_dir)
 
 def run_make_taxonomy_tab(fasta, length_cutoff):
 	"""Runs make_taxonomy_table.py and directs output to taxonomy.tab for run_autometa.py"""
@@ -130,7 +130,8 @@ def length_trim(fasta, length_cutoff, outfpath=None):
 
 	outfname += ".filtered" + ext
 	output_path = os.path.join(output_dir, outfname)
-	cmd = ' '.join(map(str,['{}/fasta_length_trim.py'.format(pipeline_path),
+	cmd = ' '.join(map(str,[
+					os.path.join(pipeline_path,'fasta_length_trim.py'),
 					fasta,
 					length_cutoff,
 					output_path]))
@@ -203,7 +204,8 @@ def make_marker_table(fasta):
 	return outfpath
 
 def recursive_dbscan(input_table, filtered_assembly, domain):
-	dbscan_outfpath = os.path.join(output_dir,'recursive_dbscan_output.tab')
+	fname = '{}_recursive_dbscan_output.tab'.format(domain)
+	dbscan_outfpath = os.path.join(output_dir,fname)
 	kmer_fpath = os.path.join(output_dir,'k-mer_matrix')
 	cmd = ' '.join([
 		os.path.join(pipeline_path,'recursive_dbscan.py'),
@@ -216,7 +218,7 @@ def recursive_dbscan(input_table, filtered_assembly, domain):
 	return dbscan_outfpath, kmer_fpath
 
 def combine_tables(table1_path, table2_path):
-	comb_table_path = output_dir + '/combined_contig_info.tab'
+	comb_table_path = os.path.join(output_dir,'combined_contig_info.tab')
 	# Note: in this sub we assume that the tables have column 1 in common
 	# Store lines of table 2, keyed by the value of the first column
 
@@ -263,41 +265,40 @@ def ML_recruitment(input_table, matrix):
 	return outfpath
 
 def cami_format(infpath, out_dpath):
-	fpath, ext = os.path.splitext(infpath)
-	master_output = '.'.join([fpath, 'binning'])
-	# "git -C " + autom_path + " branch | grep \* | sed 's/^..//'"
-	cmd = ' '.join(map(str,['git',
-								'-C', autometa_path,
-								'branch','|',
-								'grep', '\*' '|',
-								'sed', "'s/^..//'"]))
-	branch = subprocess.Popen(cmd,
-							shell=True,
-							stdout=subprocess.PIPE).communicate()[0].rstrip()
-	cmd = 'git -C ' + autometa_path + ' rev-parse --short HEAD'
-	commit = subprocess.Popen(cmd,
-							shell=True,
-							stdout=subprocess.PIPE).communicate()[0].rstrip()
-	version = '@Version:Autometa.{}.{}'.format(branch.upper(),commit)
-	#@Version:AutometaBranchCommit
-	for d in os.path.abspath(out_dpath).split('/'):
-		if 'sample' in d:
-			sampleid = '@SampleID:{}'.format(d)
-			break
-	#@SampleID:SAMPLEID
-	#@@SEQUENCEID\tBINID
-	try:
-		print('using {}'.format(sampleid))
-	except NameError as err:
-		sdir = os.path.basename(os.path.dirname(os.path.abspath(out_dpath)))
-		sid = '@SampleID:{}.autometaRun'.format(sdir)
-	with open(master_output, 'w') as outfile:
-		lines = '\n'.join([version, sid, '@@SEQUENCEID\tBINID\n'])
-		outfile.write(lines)
+	master_output = os.path.join(out_dpath, 'autometa_cami2.binning')
+	if not os.path.exists(master_output):
+		# "git -C " + autom_path + " branch | grep \* | sed 's/^..//'"
+		cmd = ' '.join(map(str,['git',
+									'-C', autometa_path,
+									'branch','|',
+									'grep', '\*' '|',
+									'sed', "'s/^..//'"]))
+		branch = subprocess.Popen(cmd,
+								shell=True,
+								stdout=subprocess.PIPE).communicate()[0].rstrip()
+		cmd = ' '.join(['git -C', str(autometa_path), 'rev-parse --short HEAD'])
+		commit = subprocess.Popen(cmd,
+								shell=True,
+								stdout=subprocess.PIPE).communicate()[0].rstrip()
+		version = '@Version:0.9.0'
+		#@Version:AutometaBranchCommit
+		for d in os.path.abspath(out_dpath).split('/'):
+			if 'sample' in d:
+				sampleid = '@SampleID:{}'.format(d)
+				break
+		#@SampleID:SAMPLEID
+		#@@SEQUENCEID\tBINID
+		try:
+			print('using {}'.format(sampleid))
+			sid = sampleid
+		except NameError as err:
+			sdir = os.path.basename(os.path.dirname(os.path.abspath(out_dpath)))
+			sid = '@SampleID:{}.autometaRun'.format(sdir)
+		with open(master_output, 'w') as outfile:
+			lines = '\n'.join([version, sid, '@@SEQUENCEID\tBINID\n'])
+			outfile.write(lines)
 	cols = ['contig', 'cluster']
 	df = pd.read_csv(infpath, sep='\t', usecols=cols, index_col='contig')
-	# df.index.rename('SEQUENCEID', inplace=True)
-	# df.rename(columns={'cluster':'BINID'}, inplace=True)
 	df.to_csv(master_output, mode='a', sep='\t', header=False)
 	return master_output
 
@@ -320,7 +321,7 @@ parser.add_argument('-o', '--output_dir', metavar='<dir>', help='Path to directo
 parser.add_argument('-r', '--ML_recruitment', help='Use ML to further recruit unclassified contigs', action='store_true')
 parser.add_argument('-m', '--maketaxtable', action='store_true',\
 help='runs make_taxonomy_table.py before performing autometa binning. Must specify databases directory (-db)')
-parser.add_argument('-db', '--db_dir', metavar='<dir>', help="Path to directory with taxdump files. If this doesn't exist, the files will be automatically downloaded", required=False, default=autometa_path + '/databases')
+parser.add_argument('-db', '--db_dir', metavar='<dir>', help="Path to directory with taxdump files. If this doesn't exist, the files will be automatically downloaded", required=False, default=os.path.join(autometa_path,'databases'))
 parser.add_argument('-v', '--cov_table', metavar='<coverage.tab>', help="Path to coverage table made by calculate_read_coverage.py. If this is not specified then coverage information will be extracted from contig names (SPAdes format)", required=False)
 
 args = vars(parser.parse_args())
@@ -397,23 +398,23 @@ elif taxonomy_table_path and make_tax_table:
 	if not os.path.isfile(taxonomy_table_path):
 		print "Could not find {}, running make_taxonomy_table.py".format(taxonomy_table_path)
 		logger.debug('Could not find {}, running make_taxonomy_table.py'.format(taxonomy_table_path))
-		if not os.path.isfile(pipeline_path+"/lca_functions.so"):
-			cythonize_lca_functions()
+		# if not os.path.isfile(pipeline_path+"/lca_functions.so"):
+		# 	cythonize_lca_functions()
 		taxonomy_table_path = run_make_taxonomy_tab(fasta_assembly, length_cutoff)
 		combined_table_path = combine_tables(taxonomy_table_path, marker_tab_path)
 	elif os.path.isfile(taxonomy_table_path) and os.stat(taxonomy_table_path).st_size == 0:
 		print "{} file is empty, running make_taxonomy_table.py".format(taxonomy_table_path)
 		logger.debug('{} file is empty, running make_taxonomy_table.py'.format(taxonomy_table_path))
-		if not os.path.isfile(pipeline_path+"/lca_functions.so"):
-			cythonize_lca_functions()
+		# if not os.path.isfile(pipeline_path+"/lca_functions.so"):
+		# 	cythonize_lca_functions()
 		taxonomy_table_path = run_make_taxonomy_tab(fasta_assembly, length_cutoff)
 		combined_table_path = combine_tables(taxonomy_table_path, marker_tab_path)
 	else:
 		print "{} already exists, not performing make_taxonomy_table.py".format(taxonomy_table_path)
 		combined_table_path = combine_tables(taxonomy_table_path, marker_tab_path)
 elif not taxonomy_table_path and make_tax_table:
-	if not os.path.isfile(pipeline_path+"/lca_functions.so"):
-		cythonize_lca_functions()
+	# if not os.path.isfile(pipeline_path+"/lca_functions.so"):
+	# 	cythonize_lca_functions()
 	taxonomy_table_path = run_make_taxonomy_tab(fasta_assembly, length_cutoff)
 	combined_table_path = combine_tables(taxonomy_table_path, marker_tab_path)
 else:
@@ -423,28 +424,27 @@ else:
 # input fasta
 if make_tax_table:
 	# First, check that the expected kingdom bin is there
-	expected_kingdom_bin_path = os.path.join(output_dir, kingdom.title()+'.fasta')
-	if (not os.path.isfile(expected_kingdom_bin_path)) or os.stat(expected_kingdom_bin_path).st_size == 0:
-		print('Error at make_taxonomy_table.py stage - file {0} is either not there or empty'\
-			.format(expected_kingdom_bin_path))
-		exit(1)
+	for kingdom in ['archaea','bacteria']:
+		kingdom_fpath = os.path.join(output_dir, kingdom.title()+'.fasta')
+		if (not os.path.isfile(kingdom_fpath)) or os.stat(kingdom_fpath).st_size == 0:
+			print('Kingdom {} is either not there or empty'.format(kingdom.title()))
 
 	# Now change the input fasta to the output of make_taxonomy_table.py
-	filtered_assembly = expected_kingdom_bin_path
+	filtered_assembly = kingdom_fpath
 
-binning_outfpath, matrix_file = recursive_dbscan(
-	combined_table_path,
-	filtered_assembly,
-	kingdom
-)
+	binning_outfpath, matrix_file = recursive_dbscan(
+		combined_table_path,
+		filtered_assembly,
+		kingdom
+	)
 
-if do_ML_recruitment:
-	binning_outfpath = ML_recruitment(binning_outfpath, matrix_file)
+	if do_ML_recruitment:
+		binning_outfpath = ML_recruitment(binning_outfpath, matrix_file)
 
-master_outfpath = cami_format(binning_outfpath, output_dir)
-elapsed_time = time.strftime('%H:%M:%S', time.gmtime(round((time.time() - start_time),2)))
+	master_outfpath = cami_format(binning_outfpath, output_dir)
+	elapsed_time = time.strftime('%H:%M:%S', time.gmtime(round((time.time() - start_time),2)))
 
-print('Wrote Binning outfile to {}'.format(master_outfpath))
+	print('Wrote Binning outfile to {}'.format(master_outfpath))
 print "Done!"
 print "Elapsed time is {} (HH:MM:SS)".format(elapsed_time)
 logger.info('Done!')
