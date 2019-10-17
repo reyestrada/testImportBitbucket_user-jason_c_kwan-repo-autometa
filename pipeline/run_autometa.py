@@ -215,10 +215,11 @@ def make_marker_table(fasta, all_orfs=None, domain='bacteria'):
 	run_command_quiet(cmd)
 	return outfpath
 
-def recursive_dbscan(input_table, fasta_fp, domain, binning_outfpath):
+def recursive_dbscan(input_table, fasta_fp, domain, binning_outfpath, hgt=False):
 	kmer_fpath = os.path.join(output_dir,'k-mer_matrix')
+	binning_script = 'recursive_dbscan.py' if not hgt else 'hgt_recursive_dbscan.py'
 	cmd = ' '.join([
-		os.path.join(pipeline_path,'recursive_dbscan.py'),
+		os.path.join(pipeline_path,binning_script),
 		'-t',input_table,
 		'-a',fasta_fp,
 		'-d',output_dir,
@@ -354,6 +355,7 @@ parser.add_argument('-m', '--maketaxtable', action='store_true',\
 help='runs make_taxonomy_table.py before performing autometa binning. Must specify databases directory (-db)')
 parser.add_argument('-db', '--db_dir', metavar='<dir>', help="Path to directory with taxdump files. If this doesn't exist, the files will be automatically downloaded", required=False, default=os.path.join(autometa_path,'databases'))
 parser.add_argument('-v', '--cov_table', metavar='<coverage.tab>', help="Path to coverage table made by calculate_read_coverage.py. If this is not specified then coverage information will be extracted from contig names (SPAdes format)", required=False)
+parser.add_argument('--HGT', help="run hgt_recursive_dbscan.py instead of recursive_dbscan.py", required=False, action='store_true')
 
 args = vars(parser.parse_args())
 
@@ -482,7 +484,10 @@ if make_tax_table:
 				table2_path=marker_tab_path,
 				outfname=combined_table_fname,
 			)
-		binning_fname = '{}_recursive_dbscan_output.tab'.format(kingdom)
+		if not args['HGT']:
+			binning_fname = '{}_recursive_dbscan_output.tab'.format(kingdom)
+		else:
+			binning_fname = '{}_hgt_recursive_dbscan_output.tab'.format(kingdom)
 		binning_outfpath = os.path.join(output_dir, binning_fname)
 		if not os.path.exists(binning_outfpath):
 			binning_outfpath, matrix_file = recursive_dbscan(
@@ -490,6 +495,7 @@ if make_tax_table:
 				fasta_fp=kingdom_fpath,
 				domain=kingdom,
 				output_table=binning_outfpath,
+				hgt=args['HGT'],
 			)
 
 		if do_ML_recruitment:
