@@ -304,7 +304,7 @@ def run_blast2lca(input_file, taxdump_path):
 	if os.path.isfile(outfpath) and not os.stat(outfpath).st_size == 0:
 		print "{} file already exists! Continuing to next step...".format(outfpath)
 	else:
-		cmd = ' '.join(['{}/lca.py'.format(pipeline_path),
+		cmd = ' '.join([os.path.join(pipeline_path,'lca.py'),
 						'database_directory', db_dir_path,
 						input_file])
 		run_command(cmd)
@@ -317,15 +317,14 @@ def run_taxonomy(pipeline_path, assembly_path, tax_table_path, db_dir_path,
 
 	# Only make the contig table if it doesn't already exist
 	if not os.path.isfile(initial_table_path):
+		make_ctg_table_script = os.path.join(pipeline_path, 'make_contig_table.py')
+		cmd = [make_ctg_table_script,'-a',assembly_path,'-o',initial_table_path]
 		if coverage_table:
-			run_command("{}/make_contig_table.py -a {} -o {} -c {}"\
-			.format(pipeline_path, assembly_path, initial_table_path, coverage_table))
-		elif single_genome_mode:
-			run_command("{}/make_contig_table.py -a {} -o {} -n"\
-			.format(pipeline_path, assembly_path, initial_table_path))
-		else:
-			run_command("{}/make_contig_table.py -a {} -o {}"\
-			.format(pipeline_path, assembly_path, initial_table_path))
+			cmd.extend(['-c',coverage_table])
+		if single_genome_mode:
+			cmd.extend(['-n'])
+		cmd = ' '.join(cmd)
+		run_command(cmd)
 	if bgcs_path:
 		run_command("{}/mask_bgcs.py2.7 --bgc {} --orfs {} --lca {}"
 		.format(pipeline_path, bgcs_path, orfs_path, tax_table_path))
@@ -335,7 +334,7 @@ def run_taxonomy(pipeline_path, assembly_path, tax_table_path, db_dir_path,
 	run_command("{}/add_contig_taxonomy.py {} {} {} {}/taxonomy.tab"\
 	.format(pipeline_path, initial_table_path, tax_table_path, db_dir_path, output_dir))
 
-	return output_dir + '/taxonomy.tab'
+	return os.path.join(output_dir,'taxonomy.tab')
 
 pipeline_path = sys.path[0]
 pathList = pipeline_path.split('/')
@@ -493,7 +492,7 @@ else:
 	print('taxonomy.tab exists... Splitting original contigs into kingdoms')
 
 # Split the original contigs into sets for each kingdom
-taxonomy_df = pd.read_table(taxonomy_table)
+taxonomy_df = pd.read_csv(taxonomy_table, sep='\t')
 categorized_seq_objects = {}
 
 # Load fasta file
@@ -515,7 +514,7 @@ for i, row in taxonomy_df.iterrows():
 if not single_genome_mode:
 	for kingdom in categorized_seq_objects:
 		seq_list = categorized_seq_objects[kingdom]
-		outfpath = os.path.join(output_dir, '{}.fasta'.format(kingdom))
+		outfpath = os.path.join(output_dir, kingdom+'.fasta')
 		SeqIO.write(seq_list, outfpath, 'fasta')
 
 print "Done!"

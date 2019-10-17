@@ -41,7 +41,7 @@ def run_BH_tSNE(table, do_pca=True):
 	pca_dimensions = 50
 	perplexity = 30.0
 
-	logger.info("run_BH_tSNE: Running k-mer based binning...")
+	logger.info("run BH-tSNE: Running k-mer based binning...")
 	# Note - currently doesn't handle cases where PCA dimensions and perplexity set too high
 
 	# We make a submatrix, consisting of the contigs in the table
@@ -55,14 +55,14 @@ def run_BH_tSNE(table, do_pca=True):
 	# PCA
 
 	if (len(normalized_k_mer_submatrix[0]) > pca_dimensions) and (do_pca == True):
-		logger.info('run_BH_tSNE: Principal component analysis')
+		logger.info('run BH-tSNE: Principal component analysis')
 		pca = decomposition.PCA(n_components=pca_dimensions)
 		pca_matrix = pca.fit_transform(normalized_k_mer_submatrix)
 	else:
-		logger.info('run_BH_tSNE: Principle component analysis step skipped')
+		logger.info('run BH-tSNE: Principle component analysis step skipped')
 
 	# BH-tSNE
-	logger.info('run_BH_tSNE: BH-tSNE')
+	logger.info('run BH-tSNE: BH-tSNE')
 
 	# Adjust perplexity according to the number of data points
 	# Took logic from tsne source code
@@ -192,7 +192,10 @@ def runDBSCANs(table, dimensions, hmm_dictionary, domain, completeness_cutoff, p
 	output_cluster_info = {}
 	output_contig_cluster = {}
 	for cluster in complete_and_pure_clusters:
-		output_cluster_info[cluster] = {'completeness': best_cluster_info[cluster]['completeness'], 'purity': best_cluster_info[cluster]['purity']}
+		output_cluster_info[cluster] = {
+			'completeness':best_cluster_info[cluster]['completeness'],
+			'purity':best_cluster_info[cluster]['purity'],
+		}
 
 	# Now we grab contig names from the best db table
 	for i, row in best_table_so_far.iterrows():
@@ -272,16 +275,16 @@ def getClusterInfo(pandas_table, hmm_dictionary, life_domain):
 		else:
 			purity = (float(num_single_copy_markers) / total_unique_markers) * 100
 
-		cluster_details[cluster] = { 'completeness': completeness, 'purity': purity }
+		cluster_details[cluster] = {'completeness':completeness, 'purity':purity}
 
 	return cluster_details
 
 
-def revcomp( string ):
-	trans_dict = { 'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C' }
+def revcomp(string):
+	trans_dict = {'A':'T', 'T':'A', 'C':'G', 'G':'C'}
 	complement_list = list()
 
-	for i in range(0, len(string) ):
+	for i in range(0, len(string)):
 		if string[i] in trans_dict:
 			complement_list.append(trans_dict[string[i]])
 		else:
@@ -342,16 +345,23 @@ def normalizeKmers(count_matrix): # list of lists, not a np matrix
 parser = argparse.ArgumentParser(description="Perform initial clustering via BH-tSNE and DBSCAN.")
 parser.add_argument('-t','--input_table', help='Master contig table. Optionally can contain taxonomy data', required=True)
 parser.add_argument('-a','--assembly_fasta', help='Assembly fasta', required=True)
-#parser.add_argument('-o','--output_table', help='Path to output table', required=True)
+parser.add_argument('-o','--output_table', help='Path to output table', required=True)
 parser.add_argument('-d','--output_dir', help='Path to output directory', default='.')
-parser.add_argument('-k','--kingdom', help='Kingdom to consider (archaea|bacteria)', choices=['bacteria','archaea'], default = 'bacteria')
+parser.add_argument(
+	'-k',
+	'--kingdom',
+	help='Kingdom to consider (archaea|bacteria)',
+	choices=['bacteria','archaea'],
+	default='bacteria',
+)
 
 args = vars(parser.parse_args())
 
 input_table_path = args['input_table']
 input_fasta_path = args['assembly_fasta']
 output_dir_path = args['output_dir']
-output_table_path = output_dir_path + '/recursive_dbscan_output.tab'
+# output_table_path = os.path.join(output_dir_path,'recursive_dbscan_output.tab')
+output_table_path = args['output_table']
 domain = args['kingdom']
 
 #logger
@@ -365,7 +375,7 @@ console.setFormatter(formatter)
 logger.setLevel(logging.DEBUG)
 logger.addHandler(console)
 
-input_master_table = pd.read_table(input_table_path)
+input_master_table = pd.read_csv(input_table_path, sep='\t')
 input_master_table['bh_tsne_x'] = 0
 input_master_table['bh_tsne_y'] = 0
 
@@ -376,7 +386,7 @@ for seq_record in SeqIO.parse(input_fasta_path, 'fasta'):
 
 # Count K-mer frequencies
 k_mer_size = 5
-matrix_file = output_dir_path + '/k-mer_matrix'
+matrix_file = os.path.join(output_dir_path,'{}_kmers.mat'.format(domain))
 k_mer_dict = dict() # Holds lists of k-mer counts, keyed by contig name
 
 count = 0
@@ -408,7 +418,7 @@ if os.path.isfile(matrix_file):
 			if i > 0:
 				line_list = line.rstrip().split('\t')
 				contig = line_list.pop(0)
-				line_list = [ int(x) for x in line_list ]
+				line_list = [int(x) for x in line_list]
 				k_mer_dict[contig] = line_list
 else:
 	# Count k-mers
@@ -468,7 +478,7 @@ for index, row in input_master_table.iterrows():
 master_table = input_master_table.iloc[rows_of_interest]
 
 contig_list = master_table['contig'].tolist()
-coverage_list = master_table['cov'].tolist()
+# coverage_list = master_table['cov'].tolist()
 taxonomy_matrix = list()
 
 ## Make normalized k-mer matrix
@@ -478,21 +488,21 @@ taxonomy_matrix = list()
 
 #normalized_k_mer_matrix = normalizeKmers(k_mer_counts)
 
+bh_tsne_fname = '{}_bh_tsne_output.tab'.format(domain)
+bh_tsne_outfpath = os.path.join(output_dir_path,bh_tsne_fname)
 
-BH_tSNE_output_file = output_dir_path + '/BH_tSNE_output.tab'
-
-if os.path.isfile(BH_tSNE_output_file):
-	logger.info("BH_tSNE output already exists!")
+if os.path.isfile(bh_tsne_outfpath):
+	logger.info("BH-tSNE output already exists!")
 	logger.info("Continuing to next step...")
 
 	# Now we load the file
-	master_table = pd.read_table(BH_tSNE_output_file)
+	master_table = pd.read_csv(bh_tsne_outfpath, sep='\t')
 	master_table['cluster'] = 'unclustered'
 else:
 	run_BH_tSNE(master_table)
 
 	# Write file to disk
-	master_table.to_csv(path_or_buf=BH_tSNE_output_file, sep='\t', index=False, quoting=csv.QUOTE_NONE)
+	master_table.to_csv(path_or_buf=bh_tsne_outfpath, sep='\t', index=False, quoting=csv.QUOTE_NONE)
 
 	master_table['cluster'] = 'unclustered'
 
@@ -566,11 +576,11 @@ if has_taxonomy_info and data_size > 50:
 
 					# Populate the global data structures
 					for	cluster in cluster_information:
-						new_cluster_name = 'DBSCAN' + '_round' + str(round_counter) + '_' + str(cluster)
+						new_cluster_name = 'DBSCAN_round{}_{}'.format(round_counter, cluster)
 						global_cluster_info[new_cluster_name] = cluster_information[cluster]
 
 					for contig in contig_cluster_dictionary:
-						new_cluster_name = 'DBSCAN'+ '_round' + str(round_counter) + '_' + str(contig_cluster_dictionary[contig])
+						new_cluster_name = 'DBSCAN_round{}_{}'.format(round_counter,contig_cluster_dictionary[contig])
 						table_indices = local_current_table[local_current_table['contig'] == contig].index.tolist()
 						master_table.set_value(table_indices[0], 'cluster', new_cluster_name)
 
@@ -583,25 +593,37 @@ else:
 	for dimensions in [2, 3]:
 		while True:
 		    round_counter += 1
-		    logger.info('Running DBSCAN round ' + str(round_counter))
+		    logger.info('Running DBSCAN round {}'.format(round_counter))
 
 		    #db_tables = runDBSCANs(local_current_table, dimensions)
-		    cluster_information, contig_cluster_dictionary, unclustered_table = runDBSCANs(local_current_table, dimensions, contig_markers, domain, completeness_cutoff, purity_cutoff)
+		    cluster_information, contig_cluster_dictionary, unclustered_table = runDBSCANs(
+				local_current_table,
+				dimensions,
+				contig_markers,
+				domain,
+				completeness_cutoff,
+				purity_cutoff,
+			)
 
 		    if not cluster_information:
 		        break
 
 		    # Populate the global data structures
 		    for	cluster in cluster_information:
-		        new_cluster_name = 'DBSCAN' + '_round' + str(round_counter) + '_' + str(cluster)
+		        new_cluster_name = 'DBSCAN_round{}_{}'.format(round_counter,cluster)
 		        global_cluster_info[new_cluster_name] = cluster_information[cluster]
 
 		    for contig in contig_cluster_dictionary:
-		        new_cluster_name = 'DBSCAN' + '_round' + str(round_counter) + '_' + str(contig_cluster_dictionary[contig])
+		        new_cluster_name = 'DBSCAN_round{}_{}'.format(round_counter,contig_cluster_dictionary[contig])
 		        table_indices = master_table[master_table['contig'] == contig].index.tolist()
 		        master_table.set_value(table_indices[0], 'cluster', new_cluster_name)
 
 		    local_current_table = unclustered_table
 
 # Output table
-master_table.to_csv(path_or_buf=output_table_path, sep='\t', index=False, quoting=csv.QUOTE_NONE)
+master_table.to_csv(
+	path_or_buf=output_table_path,
+	sep='\t',
+	index=False,
+	quoting=csv.QUOTE_NONE,
+)

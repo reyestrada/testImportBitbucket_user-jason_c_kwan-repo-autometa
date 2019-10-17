@@ -23,8 +23,8 @@ import subprocess
 import os
 
 #argument parser
-parser = argparse.ArgumentParser(description='Script tabulate single copy markers \
-	from a metagenome assembly. Dependencies: prodigal v2.6.2 (from "GoogleImport" branch), hhmscan (hmmer 3.1b2)')
+parser = argparse.ArgumentParser(description='Script to tabulate single copy markers \
+	from a metagenome assembly. Dependencies: prodigal v2.6.2 (from "GoogleImport" branch), hmmscan (hmmer 3.1b2)')
 parser.add_argument('-a','--assembly', help='Input assembly file', required=True)
 parser.add_argument('-p','--processors', help='Number of processors to use for hmmscan', default=1)
 parser.add_argument('-c','--cutoffs', help='Bacterial single copy hmm cutoffs as defined by Rinke et al. Default path is home directory.', default="~/Bacteria_single_copy_cutoffs.txt")
@@ -46,23 +46,56 @@ def get_contig_list(path_to_assembly):
     return contig_name_list
 
 def run_prodigal(path_to_assembly):
-	assembly_filename = path_to_assembly.split('/')[-1]
+	assembly_filename = os.path.splitext(os.path.basename(path_to_assembly))[0]
+	orfs_fpath = os.path.join(output_dir, assembly_filename+'.orfs.faa')
+	prodigal_txt = os.path.join(output_dir, assembly_filename+'.txt')
+	if os.path.isfile(orfs_fpath):
+		print('{} already exists...continuing'.format(orfs_fpath))
+		return orfs_fpath
 	#When "shell = True", need to give one string, not a list
-	subprocess.call(" ".join(['prodigal ','-i ' + path_to_assembly, '-a ' + output_dir + '/' + assembly_filename +\
-	 '.orfs.faa','-p meta', '-m', '-o ' + output_dir + '/' + assembly_filename + '.txt']), shell = True)
-	return output_dir + '/' + assembly_filename + '.orfs.faa'
+	cmd = ' '.join([
+		'prodigal',
+		'-i', path_to_assembly,
+		'-a', orfs_fpath,
+		'-p meta',
+		'-m',
+		'-o', prodigal_txt
+	])
+	subprocess.call(cmd, shell = True)
+	return orfs_fpath
 
-def run_hhmscan(path_to_prodigal_output,hmmdb):
-	subprocess.call("hmmscan --cpu {} --tblout {} {} {}".format(args['processors'],path_to_prodigal_output + ".hmm.tbl", hmmdb, path_to_prodigal_output),shell = True)
-	return path_to_prodigal_output + '.hmm.tbl'
+def run_hmmscan(orfs_fp,hmmdb):
+	hmm_outfpath = orfs_fp+'.hmm.tbl'
+	cmd = ' '.join(map(str,[
+		'hmmscan',
+		'--cpu',args['processors'],
+		'--tblout',hmm_outfpath,
+		hmmdb,
+		orfs_fp,
+	]))
+	subprocess.call(cmd, shell = True)
+	return hmm_outfpath
 
-output_dir = '/'.join(os.path.abspath(args['out']).split('/')[:-1])
+output_dir = os.path.dirname(os.path.realpath(args['out']))
 
-prodigal_output = run_prodigal(assembly)
-hmm_table_path = run_hhmscan(prodigal_output,args['hmm'])
+orfs_fpath = run_prodigal(assembly)
+hmm_table_path = run_hmmscan(orfs_fpath, args['hmm'])
 
-hmm_table = pd.read_csv(hmm_table_path, sep='\s+', usecols = [1, 2, 5], skiprows = 3, header = None, index_col = False, engine = 'python')
-cutoffs_table = pd.read_csv(args['cutoffs'], sep = '\s', engine = 'python', header = None)
+hmm_table = pd.read_csv(
+	hmm_table_path,
+	sep='\s+',
+	usecols=[1, 2, 5],
+	skiprows=3,
+	header=None,
+	index_col=False,
+	engine='python',
+)
+cutoffs_table = pd.read_csv(
+	args['cutoffs'],
+	sep='\s',
+	engine='python',
+	header=None,
+)
 
 #Search for contigs/ORFs that contain single copy PFAM domains that pass cutoff
 #for loop to search for PFAM domains in hmm table column 1:
@@ -84,28 +117,30 @@ for index,PFAM_cutoffs_id in enumerate(cutoffs_table[0]):
 #contig length, contig GC, contig len, passecd PFAM domains
 #write out tab-delimited table
 
+header = 'contig\tsingle_copy_PFAMs\tnum_single_copies\n'
+lines = header
+contig_dictionary = {}
+for count,contig in enumerate(get_contig_list(assembly)):
+	contig_dictionary[contig] = {}
+	contig_dictionary[contig]['single_copy_PFAMs'] = []
+	contig_dictionary[contig]['num_single_copies'] = 0
+	for PFAM_key,contigs in contig_ORFs_that_pass_cutoffs.items():
+		for item in contigs:
+			if str(contig) in item:
+				contig_dictionary[contig]['single_copy_PFAMs'].append(PFAM_key)
+	num_copies = len(contig_dictionary[contig]['single_copy_PFAMs'])
+	if num_copies > 0:
+		pfam_list = ','.join(contig_dictionary[contig]['single_copy_PFAMs'])
+		lines += '\t'.join(map(str,[contig,pfam_list,num_copies]))+'\n'
+	else:
+		lines += '\t'.join(map(str,[contig,'NA',num_copies]))+'\n'
+
 if args['out'] != None:
 	outfile_handle = args['out']
 else:
-	outfile_handle = assembly + ".marker.tab"
-with open(outfile_handle, 'w') as outfile:
-	outfile.write("contig" + '\t'+ "single_copy_PFAMs" + '\t' + "num_single_copies" + '\n')
-	contig_dictionary = {}
-	for count,contig in enumerate(get_contig_list(assembly)):
-		contig_dictionary[contig] = {}
-		contig_dictionary[contig]['single_copy_PFAMs'] = []
-		contig_dictionary[contig]['num_single_copies'] = 0
-		for PFAM_key,contigs in contig_ORFs_that_pass_cutoffs.items():
-			for item in contigs:
-				if str(contig) in item:
-					contig_dictionary[contig]['single_copy_PFAMs'].append(PFAM_key)
-		contig_dictionary[contig]['num_single_copies'] = len(contig_dictionary[contig]['single_copy_PFAMs'])
+	outfile_handle = assembly+".marker.tab"
 
-		if len(contig_dictionary[contig]['single_copy_PFAMs']) > 0:
-			outfile.write(str(contig) + '\t' + str(",".join(contig_dictionary[contig]['single_copy_PFAMs'])) + '\t' + \
-		 	  str(contig_dictionary[contig]['num_single_copies']) + '\n')
-		else:
-			outfile.write(str(contig) + '\t' + "NA" + '\t' + \
-		 	  str(contig_dictionary[contig]['num_single_copies']) + '\n')
+with open(outfile_handle, 'w') as outfile:
+	outfile.write(lines)
 
 print("\nDone!")
