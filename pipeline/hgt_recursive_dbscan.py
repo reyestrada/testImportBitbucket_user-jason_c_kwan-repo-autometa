@@ -530,18 +530,18 @@ bh_tsne_fname = '{}_bh_tsne_output.tab'.format(domain)
 bh_tsne_outfpath = os.path.join(output_dir_path,bh_tsne_fname)
 
 
-if os.path.isfile(BH_tSNE_output_file):
+if os.path.isfile(bh_tsne_outfpath):
 	logger.info("BH_tSNE output already exists!")
 	logger.info("Continuing to next step...")
 
 	# Now we load the file
-	master_table = pd.read_csv(BH_tSNE_output_file, sep='\t')
+	master_table = pd.read_csv(bh_tsne_outfpath, sep='\t')
 	master_table['cluster'] = 'unclustered'
 else:
 	run_BH_tSNE(master_table)
 
 	# Write file to disk
-	master_table.to_csv(path_or_buf=BH_tSNE_output_file, sep='\t', index=False, quoting=csv.QUOTE_NONE)
+	master_table.to_csv(path_or_buf=bh_tsne_outfpath, sep='\t', index=False, quoting=csv.QUOTE_NONE)
 
 	master_table['cluster'] = 'unclustered'
 
