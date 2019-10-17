@@ -494,7 +494,7 @@ if make_tax_table:
 				input_table=combined_table_path,
 				fasta_fp=kingdom_fpath,
 				domain=kingdom,
-				output_table=binning_outfpath,
+				binning_outfpath=binning_outfpath,
 				hgt=args['HGT'],
 			)
 
