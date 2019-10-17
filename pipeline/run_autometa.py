@@ -215,9 +215,7 @@ def make_marker_table(fasta, all_orfs=None, domain='bacteria'):
 	run_command_quiet(cmd)
 	return outfpath
 
-def recursive_dbscan(input_table, fasta_fp, domain):
-	fname = '{}_recursive_dbscan_output.tab'.format(domain)
-	dbscan_outfpath = os.path.join(output_dir,fname)
+def recursive_dbscan(input_table, fasta_fp, domain, binning_outfpath):
 	kmer_fpath = os.path.join(output_dir,'k-mer_matrix')
 	cmd = ' '.join([
 		os.path.join(pipeline_path,'recursive_dbscan.py'),
@@ -225,10 +223,10 @@ def recursive_dbscan(input_table, fasta_fp, domain):
 		'-a',fasta_fp,
 		'-d',output_dir,
 		'-k',domain,
-		'-o',dbscan_outfpath
+		'-o',binning_outfpath,
 	])
 	run_command(cmd)
-	return dbscan_outfpath, kmer_fpath
+	return binning_outfpath, kmer_fpath
 
 def combine_tables(table1_path, table2_path, outfname):
 	comb_table_path = os.path.join(output_dir,outfname)
@@ -491,6 +489,7 @@ if make_tax_table:
 				input_table=combined_table_path,
 				fasta_fp=kingdom_fpath,
 				domain=kingdom,
+				output_table=binning_outfpath,
 			)
 
 		if do_ML_recruitment:

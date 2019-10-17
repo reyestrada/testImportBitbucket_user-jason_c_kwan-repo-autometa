@@ -1,0 +1,6 @@
+*log
+*.c
+*.so
+build/
+test_data/
+single-copy_markers/*.h3*
