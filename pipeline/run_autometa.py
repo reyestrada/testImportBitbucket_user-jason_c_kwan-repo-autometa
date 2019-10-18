@@ -215,7 +215,7 @@ def make_marker_table(fasta, all_orfs=None, domain='bacteria'):
 	run_command_quiet(cmd)
 	return outfpath
 
-def recursive_dbscan(input_table, fasta_fp, domain, binning_outfpath, hgt=False):
+def recursive_dbscan(input_table, fasta_fp, domain, binning_tabfpath, hgt=False):
 	kmer_fpath = os.path.join(output_dir,'k-mer_matrix')
 	binning_script = 'recursive_dbscan.py' if not hgt else 'hgt_recursive_dbscan.py'
 	cmd = ' '.join([
@@ -224,10 +224,10 @@ def recursive_dbscan(input_table, fasta_fp, domain, binning_outfpath, hgt=False)
 		'-a',fasta_fp,
 		'-d',output_dir,
 		'-k',domain,
-		'-o',binning_outfpath,
+		'-o',binning_tabfpath,
 	])
 	run_command(cmd)
-	return binning_outfpath, kmer_fpath
+	return binning_tabfpath, kmer_fpath
 
 def combine_tables(table1_path, table2_path, outfname):
 	comb_table_path = os.path.join(output_dir,outfname)
@@ -275,62 +275,98 @@ def ML_recruitment(input_table, matrix):
 	run_command(cmd)
 	return outfpath
 
-def cami_format(infpath, out_dpath):
-	fname = os.path.splitext(os.path.basename(infpath))[0]
-	master_output = os.path.join(out_dpath, fname+'.binning')
-	if not os.path.exists(master_output):
-		version = '@Version:0.9.0'
-		#@Version:CAMI2BinningFileFormat
-		sample_id = '@SampleID:{}.autometaRun'.format(os.path.basename(infpath))
-		#@SampleID:SAMPLEID
-		#@@SEQUENCEID\tBINID
-		with open(master_output, 'w') as outfile:
-			lines = '\n'.join([version, sample_id, '@@SEQUENCEID\tBINID\n'])
-			outfile.write(lines)
-	cols = ['contig', 'cluster']
-	df = pd.read_csv(infpath, sep='\t', usecols=cols, index_col='contig')
-	df.to_csv(master_output, mode='a', sep='\t', header=False)
-	return master_output
-
-def rename_bins(results, outfpath, assembly_fp):
+def cami_format(infpath, outfpath, kingdom, add_taxa=False):
+	"""
+	Inputs:
+		infpath - </path/to/kingdom_[hgt_]recursive_dbscan_output.tab>
+		outfpath - </path/to/kingdom_[hgt_]recursive_dbscan_output.binning>
+		add_taxa - add TAXID column to outfpath
+		kingdom first letter designation added to BINID
+			i.e.
+				bBINID --> bacteria
+				aBINID --> archaea
+	Returns:
+		outfpath
+			- CAMI2 binning format: 0.9.0
+			- extension: binning
+			- Columns = SEQUENCEID\t[TAXID]\tBINID
+		header_section - list of lines in header section
+	"""
+	# Output current branch and commit
+	cmd = ' '.join([
+		"git -C", autometa_path,
+		"branch | grep \* | sed 's/^..//'",
+	])
+	proc_response = subprocess.Popen(cmd,shell=True,stdout=subprocess.PIPE)
+	branch = proc_response.communicate()[0].rstrip()
+	cmd = ' '.join([
+		'git -C', autometa_path,
+		'rev-parse --short HEAD',
+	])
+	proc_response = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+	commit = proc_response.communicate()[0].rstrip()
+	git_log = ':'.join([branch,commit])
+	header_section = [
+		'# Autometa branch:commit - {}'.format(git_log),
+		'# bin_0 represents unclustered',
+	]
+	version = '@Version:0.9.0'
+	sample_id = '@SampleID:{}'.format(os.path.basename(infpath))
+	outcols = '@@SEQUENCEID\tTAXID\tBINID' if add_taxa else '@@SEQUENCEID\tBINID'
+	comment = '# BINID -> [bacteria|archaea]BINID'
+	header_section.extend([comment, version, sample_id, outcols])
 	if not os.path.exists(outfpath):
-		bname = os.path.basename(assembly_fp)
-		version = '@Version:0.9.0'
-		sample_id = '@SampleID:AutometaRun-{}'.format(bname)
-		cols = '@@SEQUENCEID\tBINID'
-		header = '\n'.join([version,sample_id,cols])+'\n'
-		with open(outfpath, 'w') as outfile:
-			outfile.write(header)
-		bin_num = 0
-	else:
-		bin_num = float('-inf')
-		with open(outfpath) as fh:
+		header = '\n'.join(header_section)+'\n'
+		outfile = open(outfpath, 'w')
+		outfile.write(header)
+		outfile.close()
+	cols = ['contig', 'taxid', 'cluster'] if add_taxa else ['contig', 'cluster']
+	df = pd.read_csv(infpath, sep='\t', usecols=cols, index_col='contig')
+	df['cluster'] = df['cluster'].map(lambda x: kingdom[0]+x if x != 'unclustered' else x)
+	df.to_csv(outfpath, mode='a', sep='\t', header=False)
+	return outfpath, header_section
+
+def rename_bins(results, outfpath, assembly_fp, header_section=None, sampleid='Assembly', overwrite=True):
+	if overwrite and os.path.exists(outfpath):
+		os.remove(outfpath)
+	if not os.path.exists(outfpath):
+		header_section[-2] = '@SampleID:{}'.format(sampleid)
+		header = '\n'.join(header_section)+'\n'
+		with open(outfpath, 'w') as outfile: outfile.write(header)
+	bin_num = 0
+	with open(outfpath) as fh:
+		# Read through to get current bin number
+		for line in fh:
 			# Skip header lines
-			for _ in range(3):
-				fh.readline()
-			# Read through to get current bin number
-			for line in fh:
-				ctg, bin = line.strip().split('\t')
-				current_bin_num = int(bin.split('_')[1])
-				if current_bin_num > bin_num:
-					bin_num = current_bin_num
+			if line.startswith('#') or line.startswith('@'):
+				continue
+			bin = line.strip().split('\t')[-1]
+			current_bin_num = int(bin.split('_')[1])
+			if current_bin_num > bin_num:
+				bin_num = current_bin_num
 	# Construct bins dict
+	n_header_rows = len(header_section)
+	col_row = header_section[-1]
+	n_cols = len(col_row.split('\t'))
+	names = ['contig','taxid','binid'] if n_cols > 2 else ['contig','binid']
 	for result_fp in results:
 		df = pd.read_csv(
 			result_fp,
 			sep='\t',
-			names=['contig','binid'],
-			skiprows=3,
+			names=names,
+			skiprows=n_header_rows,
 			header=None,
 			index_col='contig',
 		)
+		arbitrary_bin = df[df['binid'] != 'unclustered']['binid'][0]
+		kingdom = arbitrary_bin[0]
 		bins = dict(list(df.groupby('binid')))
 		for binid,dff in bins.items():
 			if binid == 'unclustered':
 				dff['binid'] = 'bin_0'
 			else:
 				bin_num += 1
-				dff['binid'] = 'bin_{}'.format(bin_num)
+				dff['binid'] = '{}bin_{}'.format(kingdom,bin_num)
 			dff.to_csv(outfpath, mode='a', sep='\t', header=False)
 	return outfpath
 
@@ -355,7 +391,9 @@ parser.add_argument('-m', '--maketaxtable', action='store_true',\
 help='runs make_taxonomy_table.py before performing autometa binning. Must specify databases directory (-db)')
 parser.add_argument('-db', '--db_dir', metavar='<dir>', help="Path to directory with taxdump files. If this doesn't exist, the files will be automatically downloaded", required=False, default=os.path.join(autometa_path,'databases'))
 parser.add_argument('-v', '--cov_table', metavar='<coverage.tab>', help="Path to coverage table made by calculate_read_coverage.py. If this is not specified then coverage information will be extracted from contig names (SPAdes format)", required=False)
-parser.add_argument('--HGT', help="run hgt_recursive_dbscan.py instead of recursive_dbscan.py", required=False, action='store_true')
+parser.add_argument('--HGT', help="run hgt_recursive_dbscan.py instead of recursive_dbscan.py", required=False, action='store_true', default=False)
+parser.add_argument('--add-taxid', help="add taxid to binning output", required=False, action='store_true', default=False)
+parser.add_argument('--no-overwrite', help="do not overwrite binning table results", required=False, action='store_true', default=False)
 
 args = vars(parser.parse_args())
 
@@ -488,20 +526,31 @@ if make_tax_table:
 			binning_fname = '{}_recursive_dbscan_output.tab'.format(kingdom)
 		else:
 			binning_fname = '{}_hgt_recursive_dbscan_output.tab'.format(kingdom)
-		binning_outfpath = os.path.join(output_dir, binning_fname)
-		if not os.path.exists(binning_outfpath):
-			binning_outfpath, matrix_file = recursive_dbscan(
+		binning_tabfpath = os.path.join(output_dir, binning_fname)
+		if not os.path.exists(binning_tabfpath):
+			binning_tabfpath, matrix_file = recursive_dbscan(
 				input_table=combined_table_path,
 				fasta_fp=kingdom_fpath,
 				domain=kingdom,
-				binning_outfpath=binning_outfpath,
+				binning_tabfpath=binning_tabfpath,
 				hgt=args['HGT'],
 			)
 
 		if do_ML_recruitment:
-			binning_outfpath = ML_recruitment(binning_outfpath, matrix_file)
+			binning_tabfpath = ML_recruitment(binning_tabfpath, matrix_file)
+		# Clear previous *.binning results for concatenation.
+		binning_bname = os.path.splitext(os.path.basename(binning_tabfpath))[0]
+		cami_formatted_results = os.path.join(output_dir, binning_bname+'.binning')
+		if not args['no_overwrite'] and os.path.exists(cami_formatted_results):
+			print('removing previous results: {}'.format(cami_formatted_results))
+			os.remove(cami_formatted_results)
 
-		cami_formatted_results = cami_format(binning_outfpath, output_dir)
+		cami_formatted_results, header_section = cami_format(
+			infpath=binning_tabfpath,
+			outfpath=cami_formatted_results,
+			kingdom=kingdom,
+			add_taxa=args['add_taxid'],
+		)
 		elapsed_time = time.strftime('%H:%M:%S', time.gmtime(round((time.time() - start_time),2)))
 		all_results.append(cami_formatted_results)
 		print('Wrote Binning results to {}'.format(cami_formatted_results))
@@ -509,6 +558,8 @@ if make_tax_table:
 		results=all_results,
 		outfpath=os.path.join(output_dir,'autometa_cami2.binning'),
 		assembly_fp=fasta_assembly,
+		header_section=header_section,
+		sampleid=os.path.basename(fasta_assembly),
 	)
 
 print "Done!"
