@@ -194,6 +194,7 @@ def parse_lca(lca_fpath, nodes_dict):
     lca_hits = {}
     # lca_hits[contig][rank][taxid] (running total of each thing)
     fh = open(lca_fpath)
+    skipped = set()
     for line in tqdm(fh, total=number_of_lines):
         orf, name, rank, taxid = line.strip().split('\t')
         contig, orf_num = orf.rsplit('_', 1)
@@ -201,9 +202,13 @@ def parse_lca(lca_fpath, nodes_dict):
         if taxid != 1:
             while rank not in set(rank_priority):
                 if taxid not in nodes_dict:
-                    print('{} taxid not in nodes.dmp.'.format(taxid))
-                    print('Update nodes.dmp and re-run')
-                    sys.exit(1)
+                    skipped.add(taxid)
+                    # Synchronize the nr.dmnd database against prot.accession2taxid and nodes.dmp
+                    # Otherwise this error will present itself...
+                    # I.e. accessions in nr.dmnd are now deprecated and
+                    # sys.exit(1)
+                    taxid = 1
+                    rank = 'no rank'
                 else:
                     taxid = nodes_dict[taxid]['parent']
                     rank = nodes_dict[taxid]['rank']
@@ -221,6 +226,16 @@ def parse_lca(lca_fpath, nodes_dict):
         else:
             lca_hits[contig][rank][taxid] += 1
     fh.close()
+    if skipped:
+        print(
+        "\nWARNING:\n\tAccessions in nr.dmnd or prot.accession2taxid.gz may now be "
+        "suppressed/withdrawn.\n\tUpdate your database files and "
+        "re-run diamond blastp step if you would like all relevant taxonomic information"
+        "\n\n\tTaxids not located in nodes.dmp: {}".format(len(skipped))
+        )
+        print("\n\ttaxids skipped:")
+        taxid_str = ','.join(map(str,skipped))
+        print('\t{}\n'.format(taxid_str))
     return(lca_hits)
 
 def rank_taxids(ctg_lcas, nodes_dict):
