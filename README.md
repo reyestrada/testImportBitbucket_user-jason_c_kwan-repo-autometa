@@ -1,3 +1,5 @@
+**Note: We have moved active development of Autometa to [Github](https://github.com/WiscEvan/Autometa), because it allows release tags, issue tracking and other features. We will leave this repository on Bitbucket so that previous links in our papers still work. So you can still use it. However, further updates will not be made here, including bug fixes.**
+
 Autometa
 =========
 
